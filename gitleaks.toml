@@ -1,0 +1,12 @@
+# gitleaks.toml — ShiroScout project allowlist overrides
+# Merges with gitleaks default rules (v8+). Suppresses known false positives
+# so CI passes on placeholder values that are not real secrets.
+
+[allowlist]
+description = "ShiroScout secret-scan false positive allowlist"
+paths = [
+    '''src-tauri/tauri.conf.json''',
+]
+regexes = [
+    '''PLACEHOLDER_ED25519_PUBKEY''',
+]

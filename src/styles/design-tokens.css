@@ -1,0 +1,68 @@
+:root {
+  --bg-deep: #0D0D0F;
+  --bg-glass: rgba(26,26,36,.85);
+  --bg-glass-elevated: rgba(30,30,42,.92);
+  --bg-glass-hover: rgba(36,36,48,.92);
+  --border-glass: rgba(42,42,58,.5);
+  --border-glass-light: rgba(58,58,78,.6);
+
+  --text-primary: #E4E4E7;
+  --text-secondary: #A1A1AA;
+  --text-muted: #6B6B7A;
+  --text-code: #C8C8D8;
+
+  --accent-purple: #8B5CF6;
+  --accent-purple-soft: #6D28D9;
+  --accent-purple-glow: #A78BFA;
+
+  --status-online: #22C55E;
+  --status-thinking: #8B5CF6;
+  --status-warning: #F59E0B;
+  --status-error: #EF4444;
+  --status-neutral: #6B7280;
+  --status-human-wait: #3B82F6;
+
+  --font-ui: 'Geist', -apple-system, 'Segoe UI', sans-serif;
+  --font-head: 'Instrument Sans', 'Geist', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+
+  --blur-base: blur(8px);
+  --blur-raised: blur(12px);
+  --blur-overlay: blur(16px);
+  --blur-tooltip: blur(20px);
+
+  --ease-fast: 150ms ease-out;
+  --ease-normal: 200ms ease-in-out;
+  --ease-slow: 300ms ease-out;
+
+  --r-sm: 6px; --r-md: 8px; --r-lg: 12px;
+  --backdrop-code-color: #23233a;
+}
+
+body.light{
+  --bg-deep: #F8F9FA;
+  --bg-glass: #FFFFFF;
+  --bg-glass-elevated: #F0F1F3;
+  --bg-glass-hover: #E9EAEE;
+  --border-glass: #DDDEE4;
+  --border-glass-light: #C9CBD4;
+  --text-primary: #1F2937;
+  --text-secondary: #6B7280;
+  --text-muted: #9AA0AC;
+  --text-code: #334155;
+  --accent-purple: #7C3AED;
+  --accent-purple-glow: #8B5CF6;
+  --status-online: #16A34A;
+  --status-error: #DC2626;
+  --blur-base: none; --blur-raised: none; --blur-overlay: none; --blur-tooltip: none;
+  --backdrop-code-color: transparent;
+}
+body.light .backdrop{display:none}
+body.light .glow,body.light .avatar.thinking{box-shadow:none !important}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+}
+body.reduce-motion *,body.reduce-motion *::before,body.reduce-motion *::after{
+  animation:none !important;transition:none !important;
+}

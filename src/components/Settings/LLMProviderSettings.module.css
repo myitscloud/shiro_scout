@@ -1,0 +1,196 @@
+.container{
+  padding:0 4px;
+}
+
+.roleCard{
+  background:var(--bg-glass);
+  backdrop-filter:var(--blur-base);
+  border:1px solid var(--border-glass);
+  border-radius:var(--r-lg);
+  padding:16px;
+  margin-bottom:12px;
+  transition:border-color var(--ease-fast),box-shadow var(--ease-fast);
+}
+.roleCard:focus-within{
+  border-color:var(--accent-purple);
+  box-shadow:0 0 0 1px rgba(139,92,246,.3);
+}
+
+.roleHeader{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:14px;
+}
+.roleIcon{
+  width:24px;
+  height:24px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  font-size:12px;
+  background:rgba(139,92,246,.15);
+  color:var(--accent-purple-glow);
+  border:1px solid rgba(139,92,246,.3);
+}
+.roleTitle{
+  font-family:var(--font-head);
+  font-size:13.5px;
+  font-weight:600;
+  color:var(--text-primary);
+}
+
+.formGrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:10px;
+}
+
+.field{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+.field label{
+  font-size:11px;
+  color:var(--text-secondary);
+  font-weight:500;
+  text-transform:uppercase;
+  letter-spacing:.4px;
+}
+
+.providerSelect{
+  height:34px;
+  border-radius:var(--r-md);
+  background:rgba(13,13,15,.6);
+  border:1px solid var(--border-glass-light);
+  color:var(--text-primary);
+  font-family:var(--font-mono);
+  font-size:12.5px;
+  padding:0 28px 0 11px;
+  outline:none;
+  cursor:pointer;
+  transition:border-color var(--ease-fast);
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23A1A1AA' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 10px center;
+  background-size:12px;
+}
+.providerSelect:focus{
+  border-color:var(--accent-purple);
+  box-shadow:0 0 0 1px rgba(139,92,246,.35);
+}
+.providerSelect option{
+  background:var(--bg-glass-elevated);
+  color:var(--text-primary);
+}
+
+.input{
+  height:34px;
+  border-radius:var(--r-md);
+  background:rgba(13,13,15,.6);
+  border:1px solid var(--border-glass-light);
+  color:var(--text-primary);
+  font-family:var(--font-mono);
+  font-size:12.5px;
+  padding:0 11px;
+  outline:none;
+  transition:border-color var(--ease-fast);
+}
+.input:focus{
+  border-color:var(--accent-purple);
+  box-shadow:0 0 0 1px rgba(139,92,246,.35);
+}
+
+.apiRow{
+  display:flex;
+  gap:6px;
+  align-items:stretch;
+}
+.apiRow .input{
+  flex:1;
+}
+
+.toggleBtn{
+  width:34px;
+  min-width:34px;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--border-glass-light);
+  border-radius:var(--r-md);
+  background:rgba(13,13,15,.6);
+  color:var(--text-muted);
+  cursor:pointer;
+  font-size:14px;
+  transition:color var(--ease-fast),border-color var(--ease-fast);
+}
+.toggleBtn:hover{
+  color:var(--text-primary);
+  border-color:var(--border-glass);
+}
+.toggleBtn.visible{
+  color:var(--accent-purple-glow);
+  border-color:rgba(139,92,246,.4);
+}
+
+.testRow{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:4px;
+}
+
+.testBtn{
+  height:30px;
+  padding:0 14px;
+  border-radius:var(--r-md);
+  border:1px solid var(--border-glass-light);
+  background:rgba(139,92,246,.12);
+  color:var(--accent-purple-glow);
+  font-family:var(--font-ui);
+  font-size:12px;
+  font-weight:500;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  transition:background var(--ease-fast),border-color var(--ease-fast);
+}
+.testBtn:hover:not(:disabled){
+  background:rgba(139,92,246,.2);
+  border-color:rgba(139,92,246,.4);
+}
+.testBtn:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
+
+.spinner{
+  width:14px;
+  height:14px;
+  border:2px solid rgba(139,92,246,.25);
+  border-top-color:var(--accent-purple-glow);
+  border-radius:50%;
+  animation:spin .6s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.indicator{
+  font-size:11.5px;
+  font-family:var(--font-mono);
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+.indicatorOk{
+  color:var(--status-online);
+}
+.indicatorFail{
+  color:var(--status-error);
+}
+
+.fullWidth{
+  grid-column:1 / -1;
+}

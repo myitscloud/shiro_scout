@@ -1,0 +1,35 @@
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg-deep);
+  color:var(--text-primary);
+  font-family:var(--font-ui);
+  font-size:14px;
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--border-glass-light);border-radius:8px}
+::-webkit-scrollbar-thumb:hover{background:var(--status-neutral)}
+::-webkit-scrollbar-track{background:transparent}
+
+.glass{background:var(--bg-glass);backdrop-filter:var(--blur-base);-webkit-backdrop-filter:var(--blur-base);border:1px solid var(--border-glass)}
+.glass-raised{background:var(--bg-glass-hover);backdrop-filter:var(--blur-raised);-webkit-backdrop-filter:var(--blur-raised);border:1px solid var(--border-glass-light)}
+.glass-overlay{background:var(--bg-glass-elevated);backdrop-filter:var(--blur-overlay);-webkit-backdrop-filter:var(--blur-overlay);border:1px solid var(--border-glass-light)}
+@supports not (backdrop-filter: blur(8px)){
+  .glass,.glass-raised,.glass-overlay{background:#16161e}
+}
+
+.backdrop{
+  position:fixed;inset:0;z-index:0;overflow:hidden;
+  font-family:var(--font-mono);font-size:12px;line-height:1.9;
+  color:var(--backdrop-code-color);
+  white-space:pre;user-select:none;pointer-events:none;
+  padding:44px 24px;
+  mask-image:radial-gradient(ellipse at 50% 40%, rgba(0,0,0,.9), rgba(0,0,0,.45));
+}
+
+.skip{position:absolute;left:8px;top:-40px;z-index:99;background:var(--accent-purple);color:#fff;padding:8px 12px;border-radius:6px;transition:top .15s}
+.skip:focus{top:8px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}

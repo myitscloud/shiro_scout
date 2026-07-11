@@ -1,0 +1,12 @@
+.app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh}
+.workspace{display:flex;flex:1;min-height:0}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+
+@media (max-width:1180px){.rightpanel{display:none}}
+@media (max-width:880px){
+  .sidebar{width:48px;min-width:48px}
+  .sb-label,.agent-name,.agent-phase,.sessions,.new-session span{display:none}
+  .agent-slot{justify-content:center;padding:6px}
+  .new-session{width:32px;padding:0;margin:8px auto}
+}

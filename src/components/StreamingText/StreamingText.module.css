@@ -1,0 +1,66 @@
+/* StreamingText — Neo-Glass Terminus Design Language */
+
+@keyframes cursorBreath {
+  0%, 100% { opacity: 0.6; text-shadow: 0 0 4px var(--accent-purple-glow); }
+  50%      { opacity: 1;   text-shadow: 0 0 8px var(--accent-purple-glow); }
+}
+
+.wrapper {
+  position: relative;
+  line-height: 1.6;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.content {
+  display: inline;
+}
+
+.cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1.1em;
+  background: var(--accent-purple);
+  vertical-align: text-bottom;
+  margin-left: 1px;
+  border-radius: 1px;
+  animation: cursorBreath 1.8s ease-in-out infinite;
+}
+
+.markdownContent {
+  display: inline;
+}
+
+.markdownContent p {
+  margin: 0;
+  display: inline;
+}
+
+.markdownContent code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-code);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.markdownContent strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.markdownContent em {
+  font-style: italic;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .cursor {
+    animation: none;
+    opacity: 0.6;
+  }
+}

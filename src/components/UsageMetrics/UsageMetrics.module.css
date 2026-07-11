@@ -1,0 +1,226 @@
+/* ============================================================
+ * UsageMetrics — Neo-Glass Terminus
+ * ============================================================
+ * Uses design tokens only (F11). Supports compact (sidebar) and
+ * full (drawer tab) layouts. WCAG 2.2 AA compliant.
+ * ============================================================ */
+
+.container {
+  padding: 6px 14px 10px;
+  font-family: var(--font-ui);
+}
+
+.container.compact {
+  padding: 6px 10px;
+}
+
+.heading {
+  font-size: 10.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-family: var(--font-head);
+  margin: 0 0 8px;
+}
+
+/* ============================================================
+ * Empty state
+ * ============================================================ */
+
+.empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 12px 0;
+  text-align: center;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* ============================================================
+ * Table — per-role breakdown
+ * ============================================================ */
+
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-glass);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  padding: 5px 6px;
+  border-radius: var(--r-sm);
+  transition: background var(--ease-fast);
+}
+
+.row:hover {
+  background: var(--bg-glass-hover);
+}
+
+.cell {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.cell:first-child {
+  flex: 0 0 80px;
+}
+
+.cell:nth-child(2) {
+  flex: 0 0 80px;
+  text-align: right;
+}
+
+.cell:last-child {
+  flex: 0 0 72px;
+  text-align: right;
+}
+
+.cellMono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+/* ============================================================
+ * Role badges
+ * ============================================================ */
+
+.badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.badge_chat {
+  background: rgba(59, 130, 246, .16);
+  color: #60A5FA;
+  border: 1px solid rgba(59, 130, 246, .3);
+}
+
+.badge_utility {
+  background: rgba(139, 92, 246, .16);
+  color: var(--accent-purple-glow);
+  border: 1px solid rgba(139, 92, 246, .3);
+}
+
+.badge_embedding {
+  background: rgba(34, 197, 94, .16);
+  color: #4ADE80;
+  border: 1px solid rgba(34, 197, 94, .3);
+}
+
+/* ============================================================
+ * Session total
+ * ============================================================ */
+
+.total {
+  border-top: 1px solid var(--border-glass);
+  padding-top: 6px;
+}
+
+.totalRow {
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  font-weight: 600;
+  color: var(--accent-purple-glow);
+}
+
+.totalLabel {
+  flex: 1;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.totalTokens {
+  flex: 0 0 80px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.totalCost {
+  flex: 0 0 72px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+/* ============================================================
+ * Compact variant (sidebar / RightPanel)
+ * ============================================================ */
+
+.compact .heading {
+  font-size: 9.5px;
+  margin-bottom: 4px;
+}
+
+.compact .row {
+  padding: 3px 4px;
+}
+
+.compact .cell {
+  font-size: 11px;
+}
+
+.compact .cell:first-child {
+  flex: 0 0 64px;
+}
+
+.compact .cell:nth-child(2) {
+  flex: 0 0 56px;
+}
+
+.compact .cell:last-child {
+  flex: 0 0 56px;
+}
+
+.compact .totalRow {
+  padding: 2px 4px;
+}
+
+.compact .totalTokens,
+.compact .totalCost {
+  font-size: 11px;
+}
+
+.compact .empty {
+  font-size: 10.5px;
+  padding: 6px 0;
+}
+
+/* ============================================================
+ * Keyboard focus & accessibility
+ * ============================================================ */
+
+.container:focus-visible {
+  outline: 2px solid var(--accent-purple);
+  outline-offset: 2px;
+}
+
+.row:focus-within {
+  outline: 1px solid var(--border-glass-light);
+  border-radius: var(--r-sm);
+}
