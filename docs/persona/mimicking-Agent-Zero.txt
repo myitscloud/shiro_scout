@@ -1,0 +1,15 @@
+Here's the honest headline first: robustness in agent file-ops comes less from one magic crate and more from a pattern — **atomic write + read-back verify**. The crates below are how you build that.
+
+**The core stack I'd suggest:**
+
+- **`tempfile`** — your write path. Write the whole file to a `NamedTempFile` *in the same directory*, then `.persist()` (atomic rename). The agent never half-writes a file, ever. This pairs perfectly with your whole-file-rewrite doctrine from FILEOPS.
+- **`fs-err`** — drop-in replacement for `std::fs` whose errors include the file path. Since your loop feeds error text back via `fw.error.md`, this directly makes the self-healing smarter — the model sees *which* path failed, not just "Access is denied (os error 5)."
+- **`similar`** — best diff crate (mitsuhiko's). Use it after writing to diff intended-vs-actual as your verification step. Add **`diffy`** only if you need to *apply* unified patches.
+- **`ropey`** — for long files. Rope structure with O(log n) line/char indexing (it's what the Helix editor uses). Ideal for serving line-numbered windows/snippets to the model and doing targeted in-place edits without reloading a huge buffer.
+- **`tree-sitter`** — for code snippets. Parse to an AST so "replace function X" targets real node boundaries instead of fragile string matching. This is the single biggest mistake-reducer for code edits.
+- **`grep-searcher` + `ignore`** — ripgrep's actual internals as crates (BurntSushi). Fast search with .gitignore awareness for finding edit targets.
+- **`blake3`** — hash before/after writes for cheap verify-after-write checks in your Ring 1/Ring 2 verification.
+
+**Windows-specific, don't skip these:** **`dunce`** (fixes `canonicalize()` returning `\\?\C:\...` UNC paths that break downstream tools) and **`encoding_rs`** (BOM/encoding detection). Also detect and preserve CRLF vs LF yourself before writing back — that's a classic "agent silently mangled the file" failure on Windows 11.
+
+One honest caveat: since your doctrine is whole-file rewrites, `std::fs` + `tempfile` + `similar` covers 90% of it. Ropey and tree-sitter earn their complexity only when you add snippet-serving or surgical edits — add them when you hit that need, not before.

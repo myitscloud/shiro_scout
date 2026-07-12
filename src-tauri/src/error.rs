@@ -1,5 +1,5 @@
-/// Error taxonomy for the Orchestrator Agent.
-/// Ported from mimicking-agent-zero/agent.rs error handling and Agent Zero's helpers/errors.py.
+//! Error taxonomy for the Orchestrator Agent.
+//! Ported from mimicking-agent-zero/agent.rs error handling and Agent Zero's helpers/errors.py.
 use serde::Serialize;
 use thiserror::Error;
 

@@ -1,8 +1,8 @@
-/// Windows Credential Manager integration using the `windows` crate.
-/// Wraps CredWriteW / CredReadW / CredDeleteW for secure API key storage.
-/// ADR-005 mandates: "API keys are stored in the OS keychain and proxied through Tauri host."
-///
-/// Credential target format: `Windows Credential` type named `ShiroScout/{provider_name}`
+//! Windows Credential Manager integration using the `windows` crate.
+//! Wraps CredWriteW / CredReadW / CredDeleteW for secure API key storage.
+//! ADR-005 mandates: "API keys are stored in the OS keychain and proxied through Tauri host."
+//!
+//! Credential target format: `Windows Credential` type named `ShiroScout/{provider_name}`
 use serde::Serialize;
 use std::collections::HashMap;
 

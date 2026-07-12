@@ -24,9 +24,10 @@ const ROLE_SECTIONS: RoleSection[] = [
   { key: 'embedding', label: 'Embedding LLM', icon: '🧠', description: 'Vector embeddings for memory and knowledge' },
 ];
 
-const PROVIDERS = ['DeepSeek', 'OpenAI', 'Groq', 'Together', 'Ollama', 'LiteLLM'] as const;
+const PROVIDERS = ['CLOUD', 'DeepSeek', 'OpenAI', 'Groq', 'Together', 'Ollama', 'LiteLLM'] as const;
 
 const PROVIDER_MAP: Record<string, string> = {
+  'CLOUD': 'deepseek',
   'DeepSeek': 'deepseek',
   'OpenAI': 'openai',
   'Groq': 'groq',

@@ -1,8 +1,8 @@
-/// Orchestrator Agent module.
-/// Contains the core agent struct, state machine, context, and message loop.
-///
-/// Reference architecture: docs/Arch_Design/ORCHESTRATOR-ARCHITECTURE.md
-/// Source port: docs/mimicking-agent-zero/agent.rs
+//! Orchestrator Agent module.
+//! Contains the core agent struct, state machine, context, and message loop.
+//!
+//! Reference architecture: docs/Arch_Design/ORCHESTRATOR-ARCHITECTURE.md
+//! Source port: docs/mimicking-agent-zero/agent.rs
 // Module inception is by design - agent.rs contains the core Agent struct
 #[allow(clippy::module_inception)]
 pub mod agent;

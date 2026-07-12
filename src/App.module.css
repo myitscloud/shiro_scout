@@ -1,7 +1,29 @@
 .app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh}
 .workspace{display:flex;flex:1;min-height:0}
 
-.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.main :global(.thread){flex:1;overflow-y:auto;min-height:0}
+.main :global(.chat-input){flex-shrink:0}
+
+.chat-input{padding:0 20px 10px}
+
+.ci-box{
+  max-width:860px;border-radius:var(--r-lg);padding:3px 8px;
+  display:flex;align-items:center;gap:6px;
+  background:var(--bg-glass-elevated);backdrop-filter:var(--blur-raised);
+  border:1px solid var(--border-glass-light);transition:border-color var(--ease-fast),box-shadow var(--ease-fast);
+}
+.ci-box:focus-within{border-color:var(--accent-purple);box-shadow:0 0 0 1px rgba(139,92,246,.4),0 0 18px rgba(139,92,246,.18)}
+.ci-box textarea{
+  height:26px;min-height:26px;max-height:26px;width:100%;
+  background:none;border:none;resize:none;outline:none;
+  color:var(--text-primary);font-family:var(--font-mono);font-size:13px;
+  line-height:1.3;overflow-y:hidden;padding:2px 0;
+}
+.ci-box textarea::placeholder{color:var(--text-muted)}
+.ci-row{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.ci-hint{font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:4px;margin-left:auto}
+.ci-count{font-family:var(--font-mono);font-size:9px;color:var(--text-muted)}
 
 @media (max-width:1180px){.rightpanel{display:none}}
 @media (max-width:880px){

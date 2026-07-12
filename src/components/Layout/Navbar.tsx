@@ -12,25 +12,25 @@ export interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({
-  agentName = 'Alpha',
+  agentName = 'Orchestrator',
   agentStatus = 'online',
-  agentPhase = 'online',
   providerLabel = 'gpt-4o',
   sandboxLabel = 'Sandbox',
   onSettingsClick,
   onToggleRightPanel,
-}) => (
+}) => {
+
+  return (
   <header className={styles.titlebar} data-tauri-drag-region>
     <div className={styles.brand} title="Aegis — home"><span className={styles.logo}>▲</span> Aegis</div>
     <div className={styles['tb-sep']}></div>
     <div className={styles['tb-group']}>
-      <button className={styles.pill} id="agentSwitcher" title="Switch agent" aria-label="Active agent: Alpha, online">
+      <div className={styles.pill}>
         <span className={`${styles.dot} ${styles[agentStatus]}`} id="navDot"></span> <strong id="navAgent">{agentName}</strong>
-        <span id="navPhase" style={{color:'var(--text-muted)'}}>{'◉'} {agentPhase}</span> <span style={{color:'var(--text-muted)'}}>▾</span>
-      </button>
-      <button className={styles.pill} title={`Provider: Ollama · ${providerLabel} (local)`}><span className={styles.mono}>🤖 {providerLabel}</span></button>
+      </div>
+      <button className={styles.pill} title={`Provider: Ollama \u00b7 ${providerLabel} (local)`}><span className={styles.mono}>🤖 {providerLabel}</span></button>
       <button className={styles.pill} title="Local provider — no data leaves this machine" style={{color:'var(--status-online)'}}>🔒 <span>Local</span></button>
-      <button className={styles.pill} title={`Sandbox: ${sandboxLabel} · healthy`}>
+      <button className={styles.pill} title={`Sandbox: ${sandboxLabel} \u00b7 healthy`}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{color:'#4A9FE0'}}><path d="M4 11h2v2H4zm3 0h2v2H7zm3 0h2v2h-2zm-3-3h2v2H7zm3 0h2v2h-2zm0-3h2v2h-2zM2 14s.7 4.5 5.5 4.5c6.6 0 9.8-3.2 11-5 0 0 3 .4 3.5-1.5-1-.8-2.6-.6-2.6-.6s.2-1.5-1.4-2.4c-.9 1-.8 2.4-.8 2.4H2z"/></svg>
         <span className={`${styles.dot}`} style={{width:6,height:6}}></span> <span>Sandbox</span>
       </button>
@@ -43,7 +43,8 @@ const Navbar: React.FC<NavbarProps> = ({
       <button className={`${styles['win-btn']} ${styles.close}`} title="Close">✕</button>
     </div>
   </header>
-);
+  );
+};
 
 Navbar.displayName = 'Navbar';
 export default Navbar;

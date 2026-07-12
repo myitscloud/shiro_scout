@@ -89,7 +89,7 @@ pub struct StreamMessage {
 
 pub(crate) fn default_base_url_for(provider: &str) -> String {
     match provider {
-        "deepseek" => "https://api.deepseek.com/v1".to_string(),
+        "deepseek" => "https://api.deepseek.com".to_string(),
         "openai" => "https://api.openai.com/v1".to_string(),
         "groq" => "https://api.groq.com/openai/v1".to_string(),
         "together" => "https://api.together.xyz/v1".to_string(),
@@ -120,6 +120,28 @@ pub async fn stream_llm_completion(
         .unwrap_or_else(|| default_base_url_for(&input.provider));
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
+    // Resolve API key: explicit input wins; otherwise fall back to the
+    // host-side keychain (Windows Credential Manager → env var → settings).
+    // ADR-005: keys are host-resident; the WebView need not supply them.
+    let resolved_api_key: Option<String> = match input.api_key.as_deref() {
+        Some(k) if !k.is_empty() => Some(k.to_string()),
+        _ => {
+            let mut kc = keychain::Keychain::new(None);
+            kc.load_api_key(&input.provider)
+        }
+    };
+
+    if resolved_api_key.is_none() && input.provider != "ollama" {
+        let _ = app_handle.emit(
+            "llm-token",
+            LlmTokenPayload { role: input.role.clone(), token: String::new(), done: true },
+        );
+        return Err(format!(
+            "No API key found for provider '{}' (checked request, Credential Manager, environment)",
+            input.provider
+        ));
+    }
+
     // Build messages array: prepend system prompt if provided
     let mut api_messages: Vec<serde_json::Value> = Vec::new();
     if let Some(system) = &input.system_prompt {
@@ -146,7 +168,7 @@ pub async fn stream_llm_completion(
     let mut req = client.post(&url);
 
     // Add authorization header
-    if let Some(ref key) = input.api_key {
+    if let Some(ref key) = resolved_api_key {
         if !key.is_empty() && input.provider != "ollama" {
             req = req.header("Authorization", format!("Bearer {}", key));
         }

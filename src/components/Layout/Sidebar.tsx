@@ -25,24 +25,17 @@ export interface SidebarProps {
   onNewSession?: () => void;
   onAgentClick?: (id: string) => void;
   onSessionClick?: (id: string) => void;
+  onSessionDelete?: (id: string) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
-  agents = [
-    { id: 'alpha', name: 'Alpha', avatar: 'α', status: 'online', phase: '⚡', isThinking: true, isActive: true },
-    { id: 'beta', name: 'Beta', avatar: 'β', status: 'off', phase: '◉', isActive: false },
-    { id: 'gamma', name: 'Gamma', avatar: 'γ', status: 'err', phase: '⚠', isActive: false },
-  ],
-  sessions = [
-    { id: 's1', title: 'Refactor API routes', group: 'Today', isActive: true },
-    { id: 's2', title: 'Debug WMI provider init', group: 'Today' },
-    { id: 's3', title: 'Telemetry noise filter port', group: 'Yesterday' },
-    { id: 's4', title: 'Sysmon config review', group: 'Yesterday' },
-  ],
+  agents = [],
+  sessions = [],
   onToggleRail,
   onNewSession,
   onAgentClick,
   onSessionClick,
+  onSessionDelete,
 }) => {
   const groupedSessions: Record<string, SessionItem[]> = {};
   sessions.forEach(s => {
@@ -50,29 +43,55 @@ const Sidebar: React.FC<SidebarProps> = ({
     groupedSessions[s.group].push(s);
   });
 
+  const orchestrator = agents.find(a => a.id === 'orchestrator');
+  const specialists = agents.filter(a => a.id !== 'orchestrator' && a.status !== 'err');
+
   return (
     <aside className={styles.sidebar} aria-label="Agents and sessions">
+      {/* Orchestrator section */}
       <div className={styles['sb-section']}>
-        <div className={styles['sb-label']}>Agents</div>
-        {agents.map(a => (
+        <div className={styles['sb-label']}>ShiroScout</div>
+        {orchestrator && (
           <div
-            key={a.id}
-            className={`${styles['agent-slot']} ${a.isActive ? styles.active : ''}`}
-            data-agent={a.name}
-            onClick={() => onAgentClick?.(a.id)}
+            key={orchestrator.id}
+            className={`${styles['agent-slot']} ${orchestrator.isActive ? styles.active : ''}`}
+            data-agent={orchestrator.name}
+            onClick={() => onAgentClick?.(orchestrator.id)}
             role="button"
             tabIndex={0}
-            aria-label={`Agent ${a.name}, ${a.status}`}
+            aria-label={`Agent ${orchestrator.name}, ${orchestrator.status}`}
           >
-            <div className={`${styles.avatar} ${a.isThinking ? styles.thinking : ''}`} id={`av${a.id[0].toUpperCase()}`}>
-              {a.avatar}
-              <span className={`${styles.st} ${styles[a.status]}`}></span>
+            <div className={`${styles.avatar} ${orchestrator.isThinking ? styles.thinking : ''}`} id={`av${orchestrator.id[0].toUpperCase()}`}>
+              {orchestrator.avatar}
+              <span className={`${styles.st} ${styles[orchestrator.status]}`}></span>
             </div>
-            <span className={styles['agent-name']}>{a.name}</span>
-            <span className={styles['agent-phase']} id={`ph${a.id[0].toUpperCase()}`}>{a.phase}</span>
+            <span className={styles['agent-name']}>{orchestrator.name}</span>
+            <span className={styles['agent-phase']} id={`ph${orchestrator.id[0].toUpperCase()}`}>{orchestrator.phase}</span>
           </div>
-        ))}
+        )}
       </div>
+
+      {/* Specialists section */}
+      {specialists.length > 0 && (
+        <div className={styles['sb-section']}>
+          <div className={styles['sb-label']}>Specialists</div>
+          {specialists.map(a => (
+            <div
+              key={a.id}
+              className={`${styles['agent-slot']} ${a.isActive ? styles.active : ''}`}
+              data-agent={a.name}
+              aria-label={`Agent ${a.name}, ${a.status}`}
+            >
+              <div className={`${styles.avatar} ${a.isThinking ? styles.thinking : ''}`} id={`av${a.id[0].toUpperCase()}`}>
+                {a.avatar}
+                <span className={`${styles.st} ${styles[a.status]}`}></span>
+              </div>
+              <span className={styles['agent-name']}>{a.name}</span>
+              <span className={styles['agent-phase']} id={`ph${a.id[0].toUpperCase()}`}>{a.phase}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className={styles.sessions} role="list" aria-label="Chat sessions">
         {Object.entries(groupedSessions).map(([group, items]) => (
@@ -86,6 +105,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => onSessionClick?.(s.id)}
               >
                 <span className={styles.sd}></span> {s.title}
+                <button
+                  className={styles.sessDel}
+                  title="Delete session"
+                  aria-label="Delete session"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSessionDelete?.(s.id);
+                  }}
+                >
+                  ×
+                </button>
               </div>
             ))}
           </React.Fragment>

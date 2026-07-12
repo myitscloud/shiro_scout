@@ -1,10 +1,10 @@
-/// Agent state machine for the Orchestrator.
-/// Tracks the lifecycle of the agent from boot through conversation.
-/// Each state has a clear purpose and transition rules.
-///
-/// Reference: ORCHESTRATOR-ARCHITECTURE.md §3 (Agent State Machine)
-///
-/// Wave 0 → Wave 4.1: Flow is idle → thinking (with streaming) → tool (bridge invoke) → done.
+//! Agent state machine for the Orchestrator.
+//! Tracks the lifecycle of the agent from boot through conversation.
+//! Each state has a clear purpose and transition rules.
+//!
+//! Reference: ORCHESTRATOR-ARCHITECTURE.md §3 (Agent State Machine)
+//!
+//! Wave 0 → Wave 4.1: Flow is idle → thinking (with streaming) → tool (bridge invoke) → done.
 use serde::{Deserialize, Serialize};
 use std::fmt;
 

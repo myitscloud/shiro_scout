@@ -1,8 +1,8 @@
-/// Environment sensing for the orchestrator agent.
-/// Gathers OS info, available tools, Docker status, disk space, and LLM configuration.
-/// Runs on boot and caches results in EnvironmentInfo.
-///
-/// Reference: ORCHESTRATOR-ARCHITECTURE.md §4 (Environment Awareness)
+//! Environment sensing for the orchestrator agent.
+//! Gathers OS info, available tools, Docker status, disk space, and LLM configuration.
+//! Runs on boot and caches results in EnvironmentInfo.
+//!
+//! Reference: ORCHESTRATOR-ARCHITECTURE.md §4 (Environment Awareness)
 use serde::Serialize;
 
 /// Result of a single dependency check

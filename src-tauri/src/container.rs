@@ -254,13 +254,180 @@ pub async fn exec_shell_in_container(
 // Commands
 // --------------------------------------------------------------------------
 
+// --------------------------------------------------------------------------
+// Helper: Resolve Docker build context directory
+// --------------------------------------------------------------------------
+
+/// Resolve the Docker build context directory containing Dockerfile.sandbox,
+/// entrypoint.sh, and the agent-bridge binary.
+fn resolve_docker_context() -> Result<std::path::PathBuf, String> {
+    use std::path::Path;
+
+    let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join("src-tauri").join("docker"));
+        candidates.push(cwd.join("..").join("src-tauri").join("docker"));
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            candidates.push(exe_dir.join("..").join("..").join("src-tauri").join("docker"));
+            candidates.push(exe_dir.join("..").join("..").join("..").join("src-tauri").join("docker"));
+        }
+    }
+
+    for path in &candidates {
+        if path.join("Dockerfile.sandbox").exists() {
+            return Ok(path.clone());
+        }
+    }
+
+    if Path::new("docker/Dockerfile.sandbox").exists() {
+        return Ok(Path::new("docker").to_path_buf());
+    }
+
+    Err(format!(
+        "Could not find Docker build context directory (Dockerfile.sandbox). Searched:\n{}",
+        candidates.iter().map(|p| format!("  - {}", p.display())).collect::<Vec<_>>().join("\n")
+    ))
+}
+
+// --------------------------------------------------------------------------
+// Build sandbox image independently (callable from frontend)
+// --------------------------------------------------------------------------
+
+/// Build the sandbox Docker image from Dockerfile.sandbox.
+/// Returns a success message with the image tag.
+#[tauri::command]
+pub async fn build_sandbox_image() -> Result<String, String> {
+    let docker_dir = resolve_docker_context()?;
+    let dockerfile_path = docker_dir.join("Dockerfile.sandbox");
+    let image_tag = "aegis-sandbox:latest";
+
+    if !dockerfile_path.exists() {
+        return Err(format!(
+            "Dockerfile not found at '{}'",
+            dockerfile_path.display()
+        ));
+    }
+
+    println!("[container] Building sandbox image '{}' from {} ...",
+        image_tag, dockerfile_path.display());
+
+    let output = tokio::process::Command::new("docker")
+        .arg("build")
+        .arg("-f")
+        .arg(dockerfile_path.to_string_lossy().as_ref())
+        .arg("-t")
+        .arg(image_tag)
+        .arg(docker_dir.to_string_lossy().as_ref())
+        .output()
+        .await
+        .map_err(|e| format!("Failed to execute 'docker build': {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        return Err(format!(
+            "Docker build failed (exit code: {}).\nSTDERR:\n{}\nSTDOUT:\n{}",
+            output.status.code().unwrap_or(-1), stderr, stdout
+        ));
+    }
+
+    Ok(format!("Successfully built sandbox image '{}'", image_tag))
+}
+
 /// Create a new sandbox container with the given configuration.
+///
+/// Automatically checks if the required Docker image exists. If the image is
+/// missing, it builds it from Dockerfile.sandbox before creating the container.
+///
 /// Returns the container ID and name.
 #[tauri::command]
 pub async fn create_sandbox(config: SandboxConfig) -> Result<SandboxCreateResult, String> {
     let docker = Docker::connect_with_local_defaults()
         .map_err(|e| format!("Failed to connect to Docker daemon: {}", e))?;
 
+    // Step 1: Check if the required Docker image already exists
+    let image_name = &config.image;
+    let image_exists = match docker.inspect_image(image_name).await {
+        Ok(_) => true,
+        Err(ref e) => {
+            let err_msg = e.to_string();
+            if err_msg.contains("404")
+                || err_msg.to_lowercase().contains("no such image")
+                || err_msg.to_lowercase().contains("not found")
+            {
+                false
+            } else {
+                return Err(format!(
+                    "Failed to check image '{}': {}", image_name, err_msg
+                ));
+            }
+        }
+    };
+
+    // Step 2: Build image if it does not exist yet
+    if !image_exists {
+        let docker_dir = match resolve_docker_context() {
+            Ok(d) => d,
+            Err(paths_searched) => {
+                return Err(format!(
+                    "Image '{}' not found and auto-build is not possible.\n\
+                     Build the image manually:\n\
+                       docker build -f src-tauri/docker/Dockerfile.sandbox \\
+                         -t {} src-tauri/docker/\n\
+                     Searched paths:\n{}",
+                    image_name, image_name, paths_searched
+                ));
+            }
+        };
+
+        let dockerfile_path = docker_dir.join("Dockerfile.sandbox");
+        if !dockerfile_path.exists() {
+            return Err(format!(
+                "Image '{}' not found and Dockerfile is missing at '{}'. \
+                 Build the image manually:\n\
+                   docker build -f src-tauri/docker/Dockerfile.sandbox \
+                     -t {} src-tauri/docker/",
+                image_name, dockerfile_path.display(), image_name
+            ));
+        }
+
+        println!(
+            "[container] Image '{}' not found - building from '{}' ...",
+            image_name, dockerfile_path.display()
+        );
+
+        let build_output = tokio::process::Command::new("docker")
+            .arg("build")
+            .arg("-f")
+            .arg(dockerfile_path.to_string_lossy().as_ref())
+            .arg("-t")
+            .arg(image_name)
+            .arg(docker_dir.to_string_lossy().as_ref())
+            .output()
+            .await
+            .map_err(|e| format!("Failed to execute 'docker build': {}", e))?;
+
+        if !build_output.status.success() {
+            let stderr = String::from_utf8_lossy(&build_output.stderr);
+            let stdout = String::from_utf8_lossy(&build_output.stdout);
+            return Err(format!(
+                "Docker build failed for image '{}' (exit code: {}).\n\
+                 STDERR:\n{}\nSTDOUT:\n{}",
+                image_name,
+                build_output.status.code().unwrap_or(-1),
+                stderr,
+                stdout
+            ));
+        }
+
+        println!("[container] Successfully built image '{}'", image_name);
+    }
+
+    // Step 3: Create the container
     let host_config = build_host_config(&config);
 
     let container_config = Config {
@@ -273,7 +440,7 @@ pub async fn create_sandbox(config: SandboxConfig) -> Result<SandboxCreateResult
         attach_stdin: Some(true),
         attach_stdout: Some(true),
         attach_stderr: Some(true),
-        healthcheck: None, // health check is set up by the image itself
+        healthcheck: None,
         ..Default::default()
     };
 

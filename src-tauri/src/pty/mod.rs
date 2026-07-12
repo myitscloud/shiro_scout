@@ -1,12 +1,12 @@
-/// Persistent PTY shell sessions inside a Docker sandbox container.
-/// Item 4.3 — builds on the bollard exec bridge (4.2) to maintain long-running
-/// /bin/bash processes inside the sandbox. State (cwd, env, venv) is preserved
-/// between commands because the same shell process stays alive.
-///
-/// Design per TRUE-STATE-PRESERVATION.md:
-/// - Each session runs a persistent /bin/bash inside the container via bollard exec
-/// - Commands sent to stdin with a unique delimiter marker
-/// - Output collected from stdout/stderr until the marker appears
+//! Persistent PTY shell sessions inside a Docker sandbox container.
+//! Item 4.3 — builds on the bollard exec bridge (4.2) to maintain long-running
+//! /bin/bash processes inside the sandbox. State (cwd, env, venv) is preserved
+//! between commands because the same shell process stays alive.
+//!
+//! Design per TRUE-STATE-PRESERVATION.md:
+//! - Each session runs a persistent /bin/bash inside the container via bollard exec
+//! - Commands sent to stdin with a unique delimiter marker
+//! - Output collected from stdout/stderr until the marker appears
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};

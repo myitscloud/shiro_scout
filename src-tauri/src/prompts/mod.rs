@@ -1,6 +1,6 @@
-/// Prompt templates for the Orchestrator Agent.
-/// Loads system prompts from the agent's prompt files on disk,
-/// and formats tool descriptions for inclusion in the system prompt.
+//! Prompt templates for the Orchestrator Agent.
+//! Loads system prompts from the agent's prompt files on disk,
+//! and formats tool descriptions for inclusion in the system prompt.
 use std::collections::HashMap;
 use crate::error::{AgentError, AgentResult};
 

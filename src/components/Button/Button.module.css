@@ -5,14 +5,17 @@
   border:1px solid var(--border-glass);color:var(--text-primary);
   background:var(--bg-glass);backdrop-filter:var(--blur-base);
   transition:all var(--ease-fast);white-space:nowrap;
+  user-select:none;-webkit-user-select:none;
 }
 .btn:focus-visible{outline:2px solid var(--accent-purple);outline-offset:2px}
 .btn.primary{
-  background:linear-gradient(180deg, rgba(139,92,246,.9), rgba(109,40,217,.9));
-  border-color:rgba(167,139,250,.5);color:#fff;
-  box-shadow:0 0 14px rgba(139,92,246,.35);
+  background:linear-gradient(135deg, rgba(139,92,246,.95), rgba(109,40,217,.95));
+  border-color:rgba(167,139,250,.6);color:#fff;
+  box-shadow:0 0 16px rgba(139,92,246,.4),inset 0 1px 0 rgba(255,255,255,.12);
+  font-weight:600;letter-spacing:.015em;
 }
-.btn.primary:hover{box-shadow:0 0 22px rgba(139,92,246,.55);transform:translateY(-1px)}
+.btn.primary:hover{box-shadow:0 0 28px rgba(139,92,246,.65);transform:translateY(-1px);border-color:rgba(167,139,250,.8)}
+.btn.primary:active{transform:translateY(0);box-shadow:0 0 8px rgba(139,92,246,.3)}
 .btn.secondary:hover{background:var(--bg-glass-hover);border-color:var(--border-glass-light)}
 .btn.ghost{background:transparent;border-color:transparent;color:var(--text-secondary)}
 .btn.ghost:hover{color:var(--text-primary);background:var(--bg-glass-hover)}

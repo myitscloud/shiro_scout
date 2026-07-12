@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { saveLlmSettings } from '../../tauri-commands';
 import LLMProviderSettings from './LLMProviderSettings';
 import styles from '../Overlay/Modal.module.css';
 
@@ -9,7 +10,7 @@ export interface SettingsProps {
 }
 
 const SettingsView: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
-  const { settings, updateSettings } = useAppContext();
+  const { settings, updateSettings, llmConfig } = useAppContext();
 
   const [theme, setTheme] = useState<'dark' | 'light'>(settings.theme);
   const [reduceMotion, setReduceMotion] = useState(settings.reduce_motion);
@@ -41,6 +42,13 @@ const SettingsView: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       sandbox_on_launch: sandboxOnLaunch,
       mount_workspace: mountWorkspace,
     });
+
+    // Also persist LLM provider config (including API keys) to disk
+    try {
+      await saveLlmSettings(llmConfig);
+    } catch (e) {
+      console.error('Failed to save LLM settings:', e);
+    }
 
     // Apply theme and motion preferences immediately
     if (theme === 'light') {
@@ -131,9 +139,9 @@ const SettingsView: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
         <div className={styles.field}>
           <label>Model</label>
           <select className={styles.input} value={model} onChange={e => setModel(e.target.value)}>
+            <option>deepseek-v4-flash (default)</option>
             <option>gpt-4o</option>
             <option>llama3.3-70b (local)</option>
-            <option>deepseek-v3</option>
             <option>claude-sonnet</option>
           </select>
         </div>

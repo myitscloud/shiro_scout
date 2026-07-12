@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './App.module.css';
 import {
   Navbar,
@@ -11,13 +11,123 @@ import {
   SettingsView,
   FirstRunWizard,
 } from './components';
+import ConfirmationDialog from './components/ConfirmationDialog/ConfirmationDialog';
 import { useAppContext } from './context/AppContext';
+import { sendMessage, respondHITL } from './tauri-commands';
+import { invoke } from '@tauri-apps/api/core';
 
-const REPLIES = [
-  'Patched src/api/handlers.rs and src/main.rs. cargo check now passes cleanly - 0 errors, 1 pre-existing warning. Migration to router_v2 is complete across all 3 files.',
-  'Understood. I will read the three call sites, apply the router_v2 signature changes, and re-run the checks before handing back.',
-  'Done. I logged the decision in DECISIONS.md and left the diff in the drawer for review.',
-];
+const SHIROSCOUT_PERSONA = `You are ShiroScout — an autonomous AI engineering agent with a sharp mind and calm precision.
+You are not a chatbot. You are an elite technical co-pilot that lives in the user\'s desktop,
+built to solve complex software tasks with clarity, focus, and high agency.
+
+---
+
+## Your Role
+
+You are ShiroScout, codename Project Aegis. You live in a Tauri 2 desktop application on
+Windows 11. The user who summoned you is your superior. You serve them with:
+- **Precision** — you think before you act
+- **Autonomy** — you don\'t wait to be told every step
+- **Honesty** — you say what you know, what you don\'t, and what you\'re doing
+- **Craft** — code, architecture, and words all get your full attention
+
+Your core directive: understand what the user needs, form a plan, execute it step by step,
+and present the result clearly. You escalate only when truly stuck.
+
+---
+
+## Communication Style
+
+- **Be concise but not terse.** Every sentence should carry weight.
+- **Start with structure.** Lead with a plan, then execute, then summarize.
+- **Think aloud when it helps.** If you\'re reasoning through a problem, surface your
+  thought process so the user can correct course early.
+- **Format for clarity.** Use headings, tables, bullet points, and code blocks.
+  Make output scannable.
+- **No fluff.** No "Sure, I can help you with that!" cheerleading. No "Great question!"
+  preamble. State what you\'re doing and do it.
+- **When stuck, say exactly what you tried, what happened, and what you need.**
+  Don\'t re-run the same failing command hoping for a different result.
+- **Use tables and code blocks** for technical data. Use plain English for explanations.
+
+---
+
+## Problem-Solving Methodology
+
+Every task follows a deliberate process:
+
+0. **Internalize** — Understand the request. If ambiguous, clarify before acting.
+1. **Plan** — Think through the steps before touching anything. Write the plan down.
+2. **Check context** — Read relevant files, check the environment, understand the
+   state of the world before making changes.
+3. **Execute** — One focused action at a time. Each step builds on the last.
+4. **Verify** — After every change, confirm it worked. Never assume success.
+5. **Report** — Summarize what was done, the result, and any notable decisions.
+
+Rules of thumb:
+- Read before you write. Understand the existing code before changing it.
+- Make minimal, focused changes that match the existing style.
+- One atomic change at a time. No monolithic edits.
+- When something fails, inspect the error, reason about it, then retry with a fix.
+  Don\'t retry the same thing.
+- Clean up after yourself — temp files, caches, stray processes all get cleaned.
+
+---
+
+## Behavioral Rules
+
+1. **High agency** — Don\'t ask for permission for obvious next steps. Just do them.
+   The user can stop you if you\'re wrong.
+
+2. **Verify everything** — Never treat a timeout, partial output, or plausible result
+   as verified success. Check file contents, exit codes, line counts.
+
+3. **Delegate specialists** — When a task needs deep expertise (Rust, UI, security,
+   testing), hand it to the appropriate specialist. Describe the role, the task,
+   the acceptance criteria, and the exact files in scope.
+
+4. **One source of truth** — Don\'t copy normative text across documents. Link to
+   authoritative sources.
+
+5. **Document decisions** — Every significant design choice gets logged with:
+   context, decision, consequences.
+
+6. **No repetition** — If the same error happens twice, stop and reason before
+   trying a third time.
+
+7. **Be transparent about uncertainty** — Distinguish between verified facts,
+   reasonable assumptions, and guesses.
+
+---
+
+## What You Know About Yourself
+
+- You live in a Tauri 2 app targeting Windows 11.
+- The app has a React/TypeScript frontend and a Rust backend.
+- The AI agent runs inside a Docker sandbox — a hardened, air-gapped Linux container.
+- The design language is Neo-Glass Terminus — deep bg, glass overlays, purple accent.
+- Your goal is to help users build, debug, and automate software tasks safely.
+- The sandbox protects the host OS. The user can review dangerous operations via
+  Human-in-the-Loop (HITL) confirmations.
+
+---
+
+*This is your identity. Internalize it. Let it shape every response you give.*
+
+---
+
+## Delegation Protocol
+
+When you need to assign work to a specialist agent, use these markers in your response:
+- To start a delegation: \`[DELEGATE:agent_id]\`
+- To end a delegation: \`[COMPLETE:agent_id]\`
+
+Valid agent IDs: architect, frontend, security, qa, docs, devops, reviewer
+
+Example: "Let me have the Architect review this. [DELEGATE:architect] The Docker bridge code needs... This is done. [COMPLETE:architect]"
+
+The markers are processed automatically and do not appear in the final chat display.
+`;
 
 function App() {
   const { addToast } = useToast();
@@ -30,37 +140,44 @@ function App() {
     sessions,
     activeSessionId,
     setActiveSessionId,
+    addSession,
+    removeSession,
     settings,
     showRightPanel,
     setShowRightPanel,
     drawerCollapsed,
     setDrawerCollapsed,
-    createContainer,
+    messages,
+    streamingMessage,
+    isStreaming,
+    startStream,
+    abortStream,
+    addUserMessage,
+    clearMessages,
+    llmConfig,
+    currentPendingHITL,
+    setCurrentPendingHITL,
   } = useAppContext();
 
   // Chat state
-  const [messages, setMessages] = useState<{ role: string; content: string; ts: string }[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamContent, setStreamContent] = useState('');
-  let replyIx = 0;
+  const threadRef = useRef<HTMLDivElement>(null);
+  const [isUserNearBottom, setIsUserNearBottom] = useState(true);
 
   // Agent/session phase state
   const [phase, setPhase] = useState<'online' | 'thinking' | 'gather' | 'tool' | 'stream'>('online');
   const [phasePct, setPhasePct] = useState<number | null>(null);
 
   // Modal state
-  const [showHitl, setShowHitl] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
-  const [hitlCountdown, setHitlCountdown] = useState(60);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setShowHitl(false); setShowSettings(false); setShowPalette(false); setShowWizard(false);
+        setCurrentPendingHITL(null); setShowSettings(false); setShowPalette(false); setShowWizard(false);
       }
       if (e.ctrlKey && e.key === 'Enter') handleSend();
       if (e.ctrlKey && e.key === '`') { e.preventDefault(); setDrawerCollapsed(p => !p); }
@@ -70,75 +187,82 @@ function App() {
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [inputValue, isStreaming]);
-
-  // HITL countdown
+  // Auto-scroll when new content arrives and user is near bottom
   useEffect(() => {
-    if (!showHitl) { setHitlCountdown(60); return; }
-    const iv = setInterval(() => {
-      setHitlCountdown(c => {
-        if (c <= 1) {
-          setShowHitl(false);
-          addToast({ message: 'Action auto-denied - no response within 60s', type: 'warning' });
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(iv);
-  }, [showHitl]);
+    const el = threadRef.current;
+    if (!el) return;
+    if (!isUserNearBottom) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [messages.length, streamingMessage, isStreaming, isUserNearBottom]);
 
-  const handleSend = useCallback(() => {
-    if (!inputValue.trim() || isStreaming) return;
-    const now = new Date();
-    const ts = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-    setMessages(prev => [...prev, { role: 'user', content: inputValue, ts }]);
-    setInputValue('');
-    setIsStreaming(true);
-    setPhase('thinking');
-    setPhasePct(null);
+  const handleThreadScroll = useCallback(() => {
+    const el = threadRef.current;
+    if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    setIsUserNearBottom(near);
+  }, []);
 
-    setTimeout(() => { setPhase('gather'); }, 900);
-    setTimeout(() => {
-      setPhase('stream');
-      setStreamContent('');
-      const target = REPLIES[replyIx++ % REPLIES.length];
-      let idx = 0;
-      const iv = setInterval(() => {
-        idx += 3;
-        if (idx >= target.length) {
-          clearInterval(iv);
-          setMessages(prev => [...prev, { role: 'assistant', content: target, ts }]);
-          setStreamContent('');
-          setIsStreaming(false);
-          setPhase('online');
-          setPhasePct(null);
-        } else {
-          setStreamContent(target.slice(0, idx));
-        }
-      }, 28);
-    }, 2000);
-  }, [inputValue, isStreaming]);
-
-  const handleNewSession = useCallback(async () => {
-    setMessages([]);
-    setPhase('online');
-    addToast({ message: 'New session started', type: 'info' });
-
-    // Create a new Docker sandbox container if Docker is available
-    if (dockerInfo.status === 'available') {
-      try {
-        await createContainer({
-          image: 'aegis-sandbox:latest',
-          workspace_path: '',
-          memory_mb: 2048,
-          cpu_shares: 512,
-          network_enabled: false,
-        });
-      } catch (err) {
-        addToast({ message: `Failed to create sandbox: ${String(err)}`, type: 'error' });
+  // Process delegation markers [DELEGATE:agent_id] and [COMPLETE:agent_id]
+  // Invokes set_agent_status and strips markers from display text
+  const processDelegationMarkers = useCallback((text: string): string => {
+    const markerRegex = /\[(DELEGATE|COMPLETE):(\w+)\]/g;
+    let match;
+    while ((match = markerRegex.exec(text)) !== null) {
+      const [, action, agentId] = match;
+      if (action === 'DELEGATE') {
+        invoke('set_agent_status', { agentId, status: 'online' });
+      } else if (action === 'COMPLETE') {
+        invoke('set_agent_status', { agentId, status: 'off' });
       }
     }
-  }, [dockerInfo.status, createContainer, addToast]);
+    return text.replace(markerRegex, '');
+  }, []);
+
+  const processedStreamingMessage = streamingMessage ? processDelegationMarkers(streamingMessage) : '';
+
+  const handleSend = useCallback(async () => {
+    if (!inputValue.trim() || isStreaming) return;
+    if (sessions.length === 0) {
+      const id = `sess-${Date.now()}`;
+      const title = inputValue.trim().slice(0, 40);
+      addSession({ id, title, group: 'Today' });
+    }
+    addUserMessage(inputValue);
+    setInputValue('');
+    const history = [
+      ...messages
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      { role: 'user' as const, content: inputValue },
+    ];
+    startStream();
+    setPhase('stream');
+    setPhasePct(null);
+    try {
+      await sendMessage(
+        history,
+        llmConfig.chat.provider,
+        llmConfig.chat.model,
+        llmConfig.chat.api_key || '',
+        SHIROSCOUT_PERSONA
+      );
+      setPhase('online');
+      setPhasePct(null);
+    } catch (err) {
+      abortStream();
+      addToast({ message: `Stream error: ${String(err)}`, type: 'error' });
+      setPhase('online');
+      setPhasePct(null);
+    }
+  }, [inputValue, isStreaming, sessions, addSession, messages, addUserMessage, startStream, llmConfig, abortStream, addToast]);
+
+  const handleNewSession = useCallback(() => {
+    const id = `sess-${Date.now()}`;
+    addSession({ id, title: 'New Session', group: 'Today' });
+    clearMessages();
+    setPhase('online');
+    addToast({ message: 'New session started', type: 'info' });
+  }, [addSession, clearMessages, addToast]);
 
   const handleKillAgent = useCallback(async () => {
     setPhase('online');
@@ -178,10 +302,11 @@ function App() {
             isActive: a.id === activeAgentId,
           }))}
           sessions={sessions.map(s => ({ ...s, isActive: s.id === activeSessionId }))}
-          onToggleRail={() => {}}
+          onToggleRail={() => setDrawerCollapsed(p => !p)}
           onNewSession={handleNewSession}
           onAgentClick={(id) => { setActiveAgentId(id); addToast({message: `Switched to agent ${agents.find(a=>a.id===id)?.name}`, type: 'info'}); }}
           onSessionClick={(id) => setActiveSessionId(id)}
+          onSessionDelete={(id) => removeSession(id)}
         />
 
         <main className={styles.main}>
@@ -193,19 +318,19 @@ function App() {
             <button className="btn sm ghost" title="Rename session">✏</button>
           </div>
 
-          <div className="thread" id="thread" role="log" aria-live="polite" aria-label={`Conversation with agent ${currentAgent.name}`}>
+          <div className="thread" id="thread" role="log" aria-live="polite" aria-label={`Conversation with agent ${currentAgent.name}`} ref={threadRef} onScroll={handleThreadScroll}>
             <div className="msg system">- session started | sandbox <b>{containerLabel}</b> attached | /workspace mounted read-write -</div>
 
             {messages.map((msg, i) => (
-              <ChatMessage key={i} variant={msg.role as 'user' | 'agent' | 'system'} who={msg.role === 'user' ? 'You' : currentAgent.name} timestamp={msg.ts}>
+              <ChatMessage key={i} variant={msg.role as 'user' | 'agent' | 'system'} who={msg.role === 'user' ? 'You' : currentAgent.name} timestamp={msg.timestamp}>
                 {msg.content}
               </ChatMessage>
             ))}
 
-            {isStreaming && streamContent && (
+            {isStreaming && streamingMessage && (
               <div className="msg agent">
                 <div className="meta"><span className="dot thinking" style={{width:7,height:7}}></span><span className="who">{currentAgent.name}</span> | {settings.model} | now</div>
-                <p><span>{streamContent}</span><span className="cursor">█</span></p>
+                <p><span>{processedStreamingMessage}</span><span className="cursor">█</span></p>
               </div>
             )}
           </div>
@@ -237,17 +362,17 @@ function App() {
             <div className="ci-box">
               <textarea
                 id="chatInput"
-                rows={2}
-                placeholder={`Message ${currentAgent.name}.  (Ctrl+Enter to send | / for commands)`}
+                rows={1}
+                placeholder={`Message ${currentAgent.name}...`}
                 aria-label="Message the agent"
                 value={inputValue}
                 onChange={e => setInputValue(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); handleSend(); }}}
               />
               <div className="ci-row">
-                <button className="btn icon ghost sm" title="Attach file" aria-label="Attach file">📎</button>
-                <button className="btn icon ghost sm" title="Slash commands" aria-label="Slash commands">/</button>
-                <button className="btn icon ghost sm" title="Insert code block" aria-label="Insert code block">{ }</button>
+                <button className="btn icon ghost sm" title="Attach file" aria-label="Attach file" onClick={() => addToast({message: 'File attachment coming soon', type: 'info'})}>📎</button>
+                <button className="btn icon ghost sm" title="Slash commands" aria-label="Slash commands" onClick={() => setInputValue(prev => prev + '/')}>/</button>
+                <button className="btn icon ghost sm" title="Insert code block" aria-label="Insert code block" onClick={() => setInputValue(prev => prev + '\n```\n\n```\n')}>{ }</button>
                 <span className="ci-hint">
                   <span className="ci-count" id="charCount">{inputValue.length}</span>
                   <kbd>Ctrl</kbd>+<kbd>Enter</kbd>
@@ -278,7 +403,7 @@ function App() {
             ]}
             costSession="$0.00 (local)"
             costDetail="disabled"
-            onViewConfig={() => addToast({message: 'Viewing agent config - coming soon', type: 'info'})}
+            onViewConfig={() => setShowSettings(true)}
             onKillAgent={handleKillAgent}
           />
         )}
@@ -289,25 +414,23 @@ function App() {
         onToggleCollapse={() => setDrawerCollapsed(p => !p)}
       />
 
-      {/* HITL approval dialog */}
-      <Modal
-        isOpen={showHitl}
-        onClose={() => setShowHitl(false)}
-        title="⚠ Human-in-the-loop required"
-        accentColor="var(--status-human-wait)"
-        actions={
-          <>
-            <span className="countdown">⏳ Auto-denying in {hitlCountdown}s</span>
-            <button className="btn secondary" onClick={() => addToast({message: 'Opening diff in the drawer', type: 'info'})}>Review files</button>
-            <button className="btn ghost" onClick={() => { setShowHitl(false); addToast({message:'Denied - agent will re-plan', type:'warning'}); }}>Deny</button>
-            <button className="btn primary" onClick={() => { setShowHitl(false); addToast({message:'Approved - action executing', type:'success'}); }}>Approve</button>
-          </>
-        }
-      >
-        <div style={{fontSize:'13px',color:'var(--text-secondary)'}}>Agent <b style={{color:'var(--text-primary)'}}>{currentAgent.name}</b> wants to run a destructive action:</div>
-        <div className="quote">delete_file | src/old_routes.rs</div>
-        <div style={{fontSize:'11.5px',color:'var(--text-muted)'}}>Default-deny is on. No approval is remembered - every write asks again.</div>
-      </Modal>
+      {currentPendingHITL && (
+        <ConfirmationDialog
+          isOpen={true}
+          onApprove={(reason) => {
+            respondHITL(currentPendingHITL.session_id, true, reason, currentPendingHITL.nonce);
+            setCurrentPendingHITL(null);
+          }}
+          onReject={(reason) => {
+            respondHITL(currentPendingHITL.session_id, false, reason, currentPendingHITL.nonce);
+            setCurrentPendingHITL(null);
+          }}
+          operationName={currentPendingHITL.operation_name}
+          operationDescription={currentPendingHITL.operation_description}
+          riskLevel={currentPendingHITL.risk_level as 'critical' | 'high' | 'medium' | 'low'}
+          onClose={() => setCurrentPendingHITL(null)}
+        />
+      )}
 
       <SettingsView isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
@@ -335,22 +458,25 @@ function App() {
 
       <FirstRunWizard isOpen={showWizard} onComplete={() => setShowWizard(false)} onSkip={() => setShowWizard(false)} />
 
-      {/* Demo launcher */}
-      <div className="demo-pill" id="demoPill">
-        <button className="btn secondary sm" id="demoBtn" onClick={() => document.getElementById('demoPill')?.classList.toggle('open')}>⚙ UI demos</button>
-        <div className="demo-menu glass-overlay">
-          <button className="btn" onClick={() => setShowHitl(true)}>⚠ HITL approval dialog</button>
-          <button className="btn" onClick={() => setShowWizard(true)}>🎉 First-run wizard</button>
-          <button className="btn" onClick={() => setShowPalette(true)}>⌘ Command palette</button>
-          <button className="btn" onClick={() => { addToast({message:'Tool completed - write_file 0.9s', type:'success'}); addToast({message:'Session autosaved', type:'info'}); addToast({message:'Context window at 78%', type:'warning'}); addToast({message:'LLM connection lost - retrying in 5s', type:'error'}); }}>🔔 Toast notifications</button>
-          <button className="btn" onClick={() => { setPhase('online'); addToast({message:'Agent Alpha hit an error | open Logs for details', type:'error'}); }}>⚠ Simulate agent error</button>
+      {/* Demo launcher — development only */}
+      {import.meta.env.DEV && (
+        <div className="demo-pill" id="demoPill">
+          <button className="btn secondary sm" id="demoBtn" onClick={() => document.getElementById('demoPill')?.classList.toggle('open')}>⚙ UI demos</button>
+          <div className="demo-menu glass-overlay">
+            <button className="btn" onClick={() => setCurrentPendingHITL({ session_id: 'demo', operation_name: 'demo_operation', operation_description: 'Demo operation for testing', risk_level: 'high', payload: null, nonce: 'demo-nonce-123' })}>⚠ HITL approval dialog</button>
+            <button className="btn" onClick={() => setShowWizard(true)}>🎉 First-run wizard</button>
+            <button className="btn" onClick={() => setShowPalette(true)}>⌘ Command palette</button>
+            <button className="btn" onClick={() => { addToast({message:'Tool completed - write_file 0.9s', type:'success'}); addToast({message:'Session autosaved', type:'info'}); addToast({message:'Context window at 78%', type:'warning'}); addToast({message:'LLM connection lost - retrying in 5s', type:'error'}); }}>🔔 Toast notifications</button>
+            <button className="btn" onClick={() => { setPhase('online'); addToast({message:'Agent Alpha hit an error | open Logs for details', type:'error'}); }}>⚠ Simulate agent error</button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 export default App;
+
 
 
 

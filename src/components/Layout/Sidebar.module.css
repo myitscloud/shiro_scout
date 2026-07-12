@@ -52,3 +52,10 @@
 .sb-footer{padding:10px;border-top:1px solid var(--border-glass);display:flex;gap:6px;align-items:center}
 .new-session{flex:1}
 .sess-item:focus-visible{outline:2px solid var(--accent-purple);outline-offset:2px}
+.sessDel{
+  margin-left:auto;flex:none;width:18px;height:18px;border-radius:4px;
+  border:none;background:transparent;color:var(--text-muted);cursor:pointer;
+  font-size:12px;display:grid;place-items:center;opacity:0;transition:all var(--ease-fast);
+}
+.sess-item:hover .sessDel{opacity:1}
+.sessDel:hover{color:var(--status-error);background:rgba(239,68,68,.15)}

@@ -16,13 +16,21 @@ pub mod hitl;
 pub mod tools;
 
 use agent::persistence::{restore_or_default, AppAgentState};
+use serde::Serialize;
 use std::sync::Mutex;
+use tauri::Emitter;
 use tauri::Manager;
 
 // --------------------------------------------------------------------------
 // Agent Bridge IPC commands (Wave 3.3)
 // Proxies to the Docker sandbox bridge on port 8080
 // --------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AgentStatusPayload {
+    pub agent_id: String,
+    pub status: String,
+}
 
 #[tauri::command]
 async fn sandbox_health() -> Result<String, String> {
@@ -57,6 +65,17 @@ async fn get_agent_status(agent_id: String) -> Result<String, String> {
     let client = bridge_client::BridgeClient::new(None).map_err(|e| format!("{}", e))?;
     let result = client.get_agent_status(&agent_id).await.map_err(|e| format!("{}", e))?;
     serde_json::to_string(&result).map_err(|e| format!("Serialization error: {}", e))
+}
+
+#[tauri::command]
+async fn set_agent_status(app_handle: tauri::AppHandle, agent_id: String, status: String) -> Result<(), String> {
+    let payload = AgentStatusPayload {
+        agent_id,
+        status,
+    };
+    app_handle
+        .emit("agent-status", payload)
+        .map_err(|e| format!("Failed to emit agent-status event: {}", e))
 }
 
 /// Entry point for the Tauri 2 application.
@@ -102,6 +121,7 @@ pub fn run() {
             // Docker/Sandbox (Wave 2 + Wave 3)
             crate::docker_client::check_docker_daemon,
             crate::container::create_sandbox,
+            crate::container::build_sandbox_image,
             crate::container::start_sandbox,
             crate::container::stop_sandbox,
             crate::container::remove_sandbox,
@@ -113,6 +133,7 @@ pub fn run() {
             run_agent,
             stop_agent,
             get_agent_status,
+            set_agent_status,
             // Agent State Persistence (Item 4.4)
             crate::agent::persistence::persist_save_state,
             crate::agent::persistence::persist_load_state,

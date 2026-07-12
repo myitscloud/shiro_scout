@@ -31,33 +31,14 @@ export interface BottomDrawerProps {
   tokenUsage?: UsageMetricsProps['tokenUsage'] | null;
 }
 
-const LOG_DEFAULTS: LogEntry[] = [
-  { ts: '12:34:56.102', level: 'info', source: 'agent.alpha', message: 'lifecycle: idle → thinking' },
-  { ts: '12:34:56.847', level: 'tool', source: 'agent.alpha', message: 'search_files(pattern="use crate::routes") → 3 hits · 0.3s' },
-  { ts: '12:34:57.301', level: 'info', source: 'sandbox', message: 'fs.watch: 2 files changed in /workspace/src' },
-  { ts: '12:34:58.010', level: 'err', source: 'agent.alpha', message: 'cargo_check exited 1 — E0432 unresolved import' },
-  { ts: '12:34:58.114', level: 'warn', source: 'provider', message: 'token/s dropped below 18 — throttling stream' },
-  { ts: '12:34:59.660', level: 'tool', source: 'agent.alpha', message: 'write_file(src/api/handlers.rs) → running' },
-  { ts: '12:35:00.021', level: 'ok', source: 'ipc', message: 'heartbeat 42ms · websocket healthy' },
-];
+const LOG_DEFAULTS: LogEntry[] = [];
 
 const BottomDrawer: React.FC<BottomDrawerProps> = ({
   collapsed = false,
   onToggleCollapse,
   logs = LOG_DEFAULTS,
-  telemetryStats = [
-    { value: '9,214', label: 'Tokens in' },
-    { value: '3,187', label: 'Tokens out' },
-    { value: '6', label: 'Tool calls' },
-    { value: '0.42s', label: 'Avg tool latency' },
-    { value: '$0.00', label: 'Est. cost (local)' },
-  ],
-  bars = [
-    { label: 'srch', height: 14 },
-    { label: 'read', height: 7 },
-    { label: 'check', height: 46 },
-    { label: 'write', height: 30 },
-  ],
+  telemetryStats = [] as TelemetryStat[],
+  bars = [] as BarItem[],
   tokenUsage = null,
 }) => {
   const [activeTab, setActiveTab] = useState<DrawerTab>('logs');
@@ -71,14 +52,13 @@ const BottomDrawer: React.FC<BottomDrawerProps> = ({
   });
 
   return (
-    <section className={styles.drawer} aria-label="Logs, terminal and telemetry">
+    <section className={`${styles.drawer} ${collapsed ? styles.collapsed : ''}`} aria-label="Logs, terminal and telemetry">
       <div className={styles.drawerBar}>
         <button className={`${styles.tab} ${activeTab === 'logs' ? styles.active : ''}`} data-pane="logs" onClick={() => setActiveTab('logs')}>Logs</button>
         <button className={`${styles.tab} ${activeTab === 'term' ? styles.active : ''}`} data-pane="term" onClick={() => setActiveTab('term')}>Terminal <span className={styles.tdot} title="activity"></span></button>
         <button className={`${styles.tab} ${activeTab === 'tele' ? styles.active : ''}`} data-pane="tele" onClick={() => setActiveTab('tele')}>Telemetry</button>
         <button className={`${styles.tab} ${activeTab === 'token-usage' ? styles.active : ''}`} data-pane="token-usage" onClick={() => setActiveTab('token-usage')}>Token Usage</button>
         <div className={styles.drawerRight}>
-          <span style={{fontSize:'11px',color:'var(--text-muted)'}}>aegis-sbx-01 · alpine 3.20 · 512 MB</span>
           <kbd>Ctrl</kbd><kbd>`</kbd>
           <button className="btn icon ghost sm" id="drawerToggle" title="Collapse drawer" aria-label="Toggle drawer" onClick={onToggleCollapse}>{collapsed ? '▴' : '▾'}</button>
         </div>
@@ -113,11 +93,7 @@ const BottomDrawer: React.FC<BottomDrawerProps> = ({
             </div>
           </div>
           <div className={`${styles.pane} ${styles.term} ${activeTab === 'term' ? styles.active : ''}`} id="pane-term">
-            <span className={styles.p}>aegis@sbx-01</span><span className={styles.dim}>:/workspace$</span> cargo check<br />
-            <span className={styles.dim}>    Checking aegis-workspace v0.1.0 (/workspace)</span><br />
-            <span className={styles.errl}>error[E0432]: unresolved import `crate::routes`</span><br />
-            <span className={styles.dim}>{' -->'} src/api/handlers.rs:3:9</span><br />
-            <span className={styles.p}>aegis@sbx-01</span><span className={styles.dim}>:/workspace$</span> <span className={styles.blockcur}></span>
+            <span style={{color:'var(--text-muted)',fontStyle:'italic',fontSize:'12px',padding:'8px 0',display:'block'}}>No active terminal session — start a conversation to see terminal output</span>
           </div>
           <div className={`${styles.pane} ${activeTab === 'tele' ? styles.active : ''}`} id="pane-tele">
             <div className={styles.telegrid}>

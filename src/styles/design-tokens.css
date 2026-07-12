@@ -31,9 +31,9 @@
   --blur-overlay: blur(16px);
   --blur-tooltip: blur(20px);
 
-  --ease-fast: 150ms ease-out;
-  --ease-normal: 200ms ease-in-out;
-  --ease-slow: 300ms ease-out;
+  --ease-fast: 150ms cubic-bezier(.4,0,.2,1);
+  --ease-normal: 200ms cubic-bezier(.4,0,.2,1);
+  --ease-slow: 300ms cubic-bezier(.4,0,.2,1);
 
   --r-sm: 6px; --r-md: 8px; --r-lg: 12px;
   --backdrop-code-color: #23233a;

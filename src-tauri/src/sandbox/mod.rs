@@ -1,10 +1,10 @@
-/// Secure file path sandboxing for the orchestrator agent.
-/// Ported from file-path-controls.md using the `camino` crate.
-///
-/// Three tiers of path authorization:
-/// - Tier 1: Workspace directory — full read/write
-/// - Tier 2: Reference directory — read-only
-/// - Tier 3: Everything else — blocked
+//! Secure file path sandboxing for the orchestrator agent.
+//! Ported from file-path-controls.md using the `camino` crate.
+//!
+//! Three tiers of path authorization:
+//! - Tier 1: Workspace directory — full read/write
+//! - Tier 2: Reference directory — read-only
+//! - Tier 3: Everything else — blocked
 use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::HashSet;
 

@@ -1,4 +1,4 @@
-import React, { type ReactNode } from 'react';
+import React, { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import StreamingText from '../StreamingText/StreamingText';
 import styles from './ChatMessage.module.css';
 
@@ -27,6 +27,26 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   error = null,
   children,
 }) => {
+  const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
+
+  const handleCopy = useCallback(() => {
+    if (typeof content !== 'string' || !content) return;
+    navigator.clipboard.writeText(content).then(() => {
+      setCopied(true);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {
+      // silent fail — clipboard unavailable
+    });
+  }, [content]);
+
   /**
    * Render the content area.
    * - Agent messages that are streaming → use StreamingText with real tokens.
@@ -54,6 +74,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     return <p>{content}</p>;
   };
 
+  const showCopyButton = !isStreaming && typeof content === 'string' && content.length > 0;
+
   return (
     <div className={`${styles.msg} ${styles[variant]}`}>
       <div className={styles.meta}>
@@ -75,6 +97,17 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       )}
 
       {children}
+
+      {showCopyButton && (
+        <button
+          className={styles.copyBtn}
+          onClick={handleCopy}
+          aria-label={copied ? 'Copied' : 'Copy message'}
+          title={copied ? 'Copied' : 'Copy to clipboard'}
+        >
+          {copied ? '✓' : '📋'}
+        </button>
+      )}
     </div>
   );
 };

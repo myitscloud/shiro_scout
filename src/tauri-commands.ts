@@ -30,7 +30,7 @@ export interface SandboxConfig {
   workspace_path: string;
   memory_mb: number;
   cpu_shares: number;
-  network_enabled: boolean;
+  network_mode: 'bridge' | 'none';
 }
 
 export interface SandboxCreateResult {
@@ -53,7 +53,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   reduce_motion: false,
   provider: 'local',
-  model: 'gpt-4o',
+  model: 'deepseek-v4-flash',
   api_key: '',
   sandbox_on_launch: true,
   mount_workspace: true,
@@ -219,6 +219,16 @@ export interface HITLEvent {
   nonce: string;
 }
 
+// ============================================================
+// Agent status events — sidekick LED indicators
+// ============================================================
+
+/** Payload carried by the `agent-status` Tauri event from Rust. */
+export interface AgentStatusPayload {
+  agent_id: string;
+  status: 'online' | 'off' | 'err';
+}
+
 /** Request a HITL confirmation from the backend for a dangerous operation. */
 export async function requestHITLConfirmation(
   operation: string,
@@ -244,4 +254,35 @@ export function listenForHITLRequest(
   callback: (event: HITLEvent) => void,
 ): Promise<() => void> {
   return listen<HITLEvent>('hitl-confirmation-request', (e) => callback(e.payload));
+}
+
+// ============================================================
+// LLM Streaming — Send a message to the agent backend
+// ============================================================
+
+export interface ChatTurn {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+/** Send conversation history to the LLM; tokens arrive via `llm-token` events. */
+export async function sendMessage(
+  history: ChatTurn[],
+  provider: string,
+  model: string,
+  apiKey: string,
+  systemPrompt?: string,
+): Promise<void> {
+  return invoke<void>('stream_llm_completion', {
+    input: {
+      provider,
+      model,
+      api_key: apiKey || undefined,
+      system_prompt: systemPrompt || undefined,
+      messages: history,
+      max_tokens: 8192,
+      temperature: 0.7,
+      role: 'chat',
+    },
+  });
 }

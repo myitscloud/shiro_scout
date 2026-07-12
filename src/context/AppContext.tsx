@@ -7,9 +7,13 @@ import {
   type SandboxCreateResult,
   type TokenUsageEntry,
   type HITLEvent,
+  type AgentStatusPayload,
+  type LlmSettings,
   DEFAULT_SETTINGS,
+  DEFAULT_LLM_SETTINGS,
   loadSettings as loadSettingsFromBackend,
   saveSettings as saveSettingsToBackend,
+  getLlmSettings,
   createSandbox,
   startSandbox,
   stopSandbox,
@@ -134,6 +138,7 @@ interface AppContextValue {
   activeSessionId: string;
   setActiveSessionId: (id: string) => void;
   addSession: (session: SessionInfo) => void;
+  removeSession: (id: string) => void;
 
   // Settings (persisted)
   settings: AppSettings;
@@ -231,19 +236,17 @@ export function useAppContext(): AppContextValue {
 // ============================================================
 
 const DEFAULT_AGENTS: AgentInfo[] = [
-  { id: 'alpha', name: 'Alpha', avatar: '\u03b1', status: 'online', phase: '\u25cf', isThinking: true },
-  { id: 'beta', name: 'Beta', avatar: '\u03b2', status: 'off', phase: '\u25cf' },
-  { id: 'gamma', name: 'Gamma', avatar: '\u03b3', status: 'err', phase: '\u25cf' },
+  { id: 'orchestrator', name: 'ShiroScout', avatar: '\u26a1', status: 'online', phase: '\u25cf', isThinking: false },
+  { id: 'architect', name: 'Windows Architect', avatar: '\u2699', status: 'off', phase: '\u25cf', isThinking: false },
+  { id: 'frontend', name: 'Frontend Engineer', avatar: '\u2728', status: 'off', phase: '\u25cf' },
+  { id: 'security', name: 'Security Engineer', avatar: '\u274c', status: 'off', phase: '\u25cf' },
+  { id: 'qa', name: 'QA Engineer', avatar: '\u2661', status: 'off', phase: '\u25cf' },
+  { id: 'docs', name: 'Docs Engineer', avatar: '\u2714', status: 'off', phase: '\u25cf' },
+  { id: 'devops', name: 'Release/DevOps', avatar: '\u267b', status: 'off', phase: '\u25cf' },
+  { id: 'reviewer', name: 'Code Reviewer', avatar: '\u272f', status: 'off', phase: '\u25cf' },
 ];
 
-const DEFAULT_SESSIONS: SessionInfo[] = [
-  { id: 's1', title: 'Refactor API routes', group: 'Today' },
-  { id: 's2', title: 'Debug WMI provider init', group: 'Today' },
-  { id: 's3', title: 'Telemetry noise filter port', group: 'Yesterday' },
-  { id: 's4', title: 'Sysmon config review', group: 'Yesterday' },
-  { id: 's5', title: 'CI pipeline for sandbox img', group: 'This week' },
-  { id: 's6', title: 'Keyring credential wrapper', group: 'This week' },
-];
+export const DEFAULT_SESSIONS: SessionInfo[] = [];
 
 // ============================================================
 // Provider component
@@ -345,9 +348,11 @@ export function AppProvider({ children }: AppProviderProps) {
   const [streamError, setStreamError] = useState<string | null>(null);
   // Track the message ID of the in-progress assistant message for finalization
   const activeStreamMsgIdRef = useRef<string | null>(null);
+  const accumulatedRef = useRef('');
   const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
@@ -394,6 +399,11 @@ export function AppProvider({ children }: AppProviderProps) {
     setActiveSessionId(session.id);
   }, []);
 
+  const removeSession = useCallback((id: string) => {
+    setSessions(prev => prev.filter(s => s.id !== id));
+    setActiveSessionId(prev => prev === id ? (sessions.find(s => s.id !== id)?.id ?? '') : prev);
+  }, [sessions]);
+
   // Load settings from backend
   const loadSettings = useCallback(async () => {
     try {
@@ -401,6 +411,29 @@ export function AppProvider({ children }: AppProviderProps) {
       if (saved) {
         setSettings(saved);
       }
+    } catch {
+      // Use defaults
+    }
+    // Also restore LLM provider config (provider, model, API keys) from disk
+    try {
+      const llmSaved = await getLlmSettings();
+      setLlmConfig({
+        chat: {
+          provider: llmSaved.chat.provider,
+          model: llmSaved.chat.model,
+          api_key: llmSaved.chat.api_key || '',
+        },
+        utility: {
+          provider: llmSaved.utility.provider,
+          model: llmSaved.utility.model,
+          api_key: llmSaved.utility.api_key || '',
+        },
+        embedding: {
+          provider: llmSaved.embedding.provider,
+          model: llmSaved.embedding.model,
+          api_key: llmSaved.embedding.api_key || '',
+        },
+      });
     } catch {
       // Use defaults
     }
@@ -451,6 +484,7 @@ export function AppProvider({ children }: AppProviderProps) {
     if (!isMountedRef.current) return;
     setStreamError(null);
     setStreamingMessage('');
+    accumulatedRef.current = '';
     setIsStreaming(true);
     const msgId = generateMessageId();
     activeStreamMsgIdRef.current = msgId;
@@ -458,27 +492,29 @@ export function AppProvider({ children }: AppProviderProps) {
 
   const appendToken = useCallback((token: string) => {
     if (!isMountedRef.current) return;
-    setStreamingMessage(prev => prev + token);
+    accumulatedRef.current += token;
+    setStreamingMessage(accumulatedRef.current);
   }, []);
 
   const finalizeStream = useCallback(() => {
     if (!isMountedRef.current) return;
     const msgId = activeStreamMsgIdRef.current;
     activeStreamMsgIdRef.current = null;
+    const content = accumulatedRef.current;
+    accumulatedRef.current = '';
 
-    // Read the current streaming text via functional update
-    setMessages(prev => {
-      const content = streamingMessageRef.current;
-      if (!content && !msgId) return prev;
-      const newMsg: ChatMessage = {
-        id: msgId ?? generateMessageId(),
-        role: 'assistant',
-        content,
-        timestamp: new Date().toISOString(),
-        error: null,
-      };
-      return [...prev, newMsg];
-    });
+    if (content) {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: msgId ?? generateMessageId(),
+          role: 'assistant',
+          content,
+          timestamp: new Date().toISOString(),
+          error: null,
+        },
+      ]);
+    }
 
     setIsStreaming(false);
     setStreamingMessage('');
@@ -489,7 +525,8 @@ export function AppProvider({ children }: AppProviderProps) {
     const msgId = activeStreamMsgIdRef.current;
     activeStreamMsgIdRef.current = null;
 
-    const partialContent = streamingMessageRef.current;
+    const partialContent = accumulatedRef.current;
+    accumulatedRef.current = '';
     if (partialContent && msgId) {
       setMessages(prev => [
         ...prev,
@@ -538,9 +575,7 @@ export function AppProvider({ children }: AppProviderProps) {
     setMessages([]);
   }, []);
 
-  // Ref to keep finalizeStream/abortStream from stale closures
-  const streamingMessageRef = useRef('');
-  streamingMessageRef.current = streamingMessage;
+  // Ref is no longer needed — accumulatedRef handles streaming accumulation directly
 
   // Check Docker on mount and load settings
   useEffect(() => {
@@ -560,7 +595,23 @@ export function AppProvider({ children }: AppProviderProps) {
     };
   }, [updateTokenUsage]);
 
+ 
   // ============================================================
+  // LLM token streaming event listener
+  // ============================================================
+  useEffect(() => {
+    const unlisten = listen<{ token: string; done: boolean }>('llm-token', (event) => {
+      if (event.payload.done) {
+        finalizeStream();
+      } else if (event.payload.token) {
+        appendToken(event.payload.token);
+      }
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [appendToken, finalizeStream]);
+ // ============================================================
   // HITL event listener — Wave 7.1
   // ============================================================
   useEffect(() => {
@@ -571,6 +622,18 @@ export function AppProvider({ children }: AppProviderProps) {
       unlisten.then((fn) => fn());
     };
   }, []);
+
+  // ============================================================
+  // Agent status event listener — sidebar LED indicators
+  // ============================================================
+  useEffect(() => {
+    const unlisten = listen<AgentStatusPayload>('agent-status', (event) => {
+      updateAgentStatus(event.payload.agent_id, event.payload.status);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [updateAgentStatus]);
 
   const value: AppContextValue = {
     dockerInfo,
@@ -583,6 +646,7 @@ export function AppProvider({ children }: AppProviderProps) {
     activeSessionId,
     setActiveSessionId,
     addSession,
+    removeSession,
     settings,
     updateSettings,
     loadSettings,
@@ -624,3 +688,4 @@ export function AppProvider({ children }: AppProviderProps) {
     </AppContext.Provider>
   );
 }
+
