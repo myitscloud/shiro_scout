@@ -9,7 +9,7 @@
   font-family:var(--font-mono);font-size:13.5px;line-height:1.7;color:var(--text-primary);
   align-self:flex-start;width:100%;
 }
-.msg.system{align-self:center;background:none;border:none;color:var(--text-muted);font-size:11.5px;font-family:var(--font-mono);padding:2px 0;text-align:center}
+.msg.system{align-self:center;background:none;border:none;color:var(--text-muted);font-size:11.5px;font-family:var(--font-mono);padding:2px 20px;text-align:center}
 .msg p{margin:0 0 10px}
 .msg p:last-child{margin-bottom:0}
 .cursor{display:inline-block;color:var(--accent-purple-glow);animation:cursor-breath 1.6s ease-in-out infinite;font-weight:700}

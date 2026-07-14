@@ -1,21 +1,2 @@
-# Auto-detect text files and enforce LF line endings
-* text=auto eol=lf
-
-# Binary formats - declare explicit
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.ico binary
-*.icns binary
-*.woff binary
-*.woff2 binary
-*.eot binary
-*.ttf binary
-*.otf binary
-*.pdf binary
-*.zip binary
-*.gz binary
-*.tar binary
-*.lock binary
-agent-bridge binary
+# Ensure LF line endings for Docker artifacts (FILEOPS-031)
+docker/** text eol=lf

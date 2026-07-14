@@ -6,7 +6,6 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{info, error};
@@ -30,7 +29,7 @@ struct AgentSession {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = \"snake_case\")]
+#[serde(rename_all = "snake_case")]
 pub enum AgentStatus {
     Idle,
     Running,
@@ -45,6 +44,9 @@ pub enum AgentStatus {
 #[derive(Debug, Deserialize)]
 struct CreateAgentRequest {
     name: String,
+    /// Wire-contract field: reserved for agent configuration.
+    /// Unused until run dispatch is implemented (see fix-spec F2/Option B).
+    #[allow(dead_code)]
     config: Option<serde_json::Value>,
 }
 
@@ -90,13 +92,13 @@ struct AgentStatusResponse {
     session: Option<AgentSession>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct ToolExecRequest {
     tool: String,
     args: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct ToolExecResponse {
     success: bool,
     output: serde_json::Value,
@@ -118,7 +120,7 @@ async fn health_handler(State(state): State<AppState>) -> Json<HealthResponse> {
     let agents = state.agents.lock().await;
     let running = agents.values().filter(|a| a.status == AgentStatus::Running).count();
     Json(HealthResponse {
-        status: \"ok\".to_string(),
+        status: "ok".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         agents_running: running,
     })
@@ -136,11 +138,11 @@ async fn create_agent_handler(
         created_at: now.clone(),
         updated_at: now,
     };
-    
+
     let mut agents = state.agents.lock().await;
     agents.insert(agent_id.clone(), session);
-    info!(agent_id = %agent_id, name = %req.name, \"Agent created\");
-    
+    info!(agent_id = %agent_id, name = %req.name, "Agent created");
+
     Ok(Json(CreateAgentResponse {
         agent_id,
         status: AgentStatus::Idle,
@@ -155,14 +157,15 @@ async fn run_agent_handler(
     let session = agents.get_mut(&req.agent_id).ok_or_else(|| {
         (StatusCode::NOT_FOUND, format!("Agent '{}' not found", req.agent_id))
     })?;
-    
+
     session.status = AgentStatus::Running;
     session.updated_at = iso_timestamp();
-    
-    // In production, this dispatches to AgentKit child process via ts-node
-    // For now, return a stub result
-    info!(agent_id = %req.agent_id, prompt_len = %req.prompt.len(), \"Agent running\");
-    
+
+    // NOTE (fix-spec F2): this is a stub. No agent process is dispatched.
+    // Under Option B this must spawn the real agent runtime; under Option A
+    // this entire binary is retired.
+    info!(agent_id = %req.agent_id, prompt_len = %req.prompt.len(), "Agent running");
+
     Ok(Json(RunAgentResponse {
         agent_id: req.agent_id,
         result: serde_json::json!({"message": "Agent processing started. Use getAgentStatus() for updates."}).to_string(),
@@ -178,11 +181,11 @@ async fn stop_agent_handler(
     let session = agents.get_mut(&req.agent_id).ok_or_else(|| {
         (StatusCode::NOT_FOUND, format!("Agent '{}' not found", req.agent_id))
     })?;
-    
+
     session.status = AgentStatus::Stopped;
     session.updated_at = iso_timestamp();
-    info!(agent_id = %req.agent_id, \"Agent stopped\");
-    
+    info!(agent_id = %req.agent_id, "Agent stopped");
+
     Ok(Json(StopAgentResponse {
         agent_id: req.agent_id,
         status: AgentStatus::Stopped,
@@ -197,7 +200,7 @@ async fn get_agent_status_handler(
     let session = agents.get(&req.agent_id).ok_or_else(|| {
         (StatusCode::NOT_FOUND, format!("Agent '{}' not found", req.agent_id))
     })?;
-    
+
     Ok(Json(AgentStatusResponse {
         agent_id: req.agent_id,
         status: session.status.clone(),
@@ -209,12 +212,14 @@ async fn tool_exec_handler(
     State(state): State<AppState>,
     Json(req): Json<ToolExecRequest>,
 ) -> Result<Json<ToolExecResponse>, (StatusCode, String)> {
-    info!(tool = %req.tool, \"Tool execution requested\");
-    
-    // Forward tool execution to Tauri host via HTTP
+    info!(tool = %req.tool, "Tool execution requested");
+
+    // Forward tool execution to Tauri host via HTTP.
+    // NOTE (fix-spec F2): the host does not run an HTTP listener on 8081, and
+    // network_mode: none blocks host.docker.internal. Dead path today.
     let client = reqwest::Client::new();
     let tauri_url = format!("{}/api/execute-tool", state.tauri_host);
-    
+
     match client.post(&tauri_url)
         .json(&req)
         .send()
@@ -227,7 +232,7 @@ async fn tool_exec_handler(
             }
         }
         Err(e) => {
-            error!(error = %e, \"Failed to forward tool exec to Tauri host\");
+            error!(error = %e, "Failed to forward tool exec to Tauri host");
             Err((StatusCode::BAD_GATEWAY, format!("Tauri host unreachable: {}", e)))
         }
     }
@@ -243,18 +248,34 @@ fn uuid_v4_simple() -> String {
     format!("{:x}-{:x}", ts.as_secs(), ts.subsec_nanos())
 }
 
+/// UTC ISO-8601 timestamp without external deps.
+/// Date conversion uses the standard civil-from-days algorithm
+/// (H. Hinnant), correct for all dates after 1970-01-01.
 fn iso_timestamp() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let d = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
-    let secs = d.as_secs();
-    let nanos = d.subsec_nanos();
-    // Format as ISO 8601 approximation
-    let days = secs / 86400;
-    let time_secs = secs % 86400;
-    let hours = time_secs / 3600;
-    let mins = (time_secs % 3600) / 60;
-    let secs_remain = time_secs % 60;
-    format!("2026-07-{:02}T{:02}:{:02}:{:02}Z", 10 + days, hours, mins, secs_remain)
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+
+    let days = secs.div_euclid(86_400);
+    let tod = secs.rem_euclid(86_400);
+    let (hh, mm, ss) = (tod / 3600, (tod % 3600) / 60, tod % 60);
+
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        year, month, day, hh, mm, ss
+    )
 }
 
 // --------------------------------------------------------------------------
@@ -266,12 +287,12 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| \"agent_bridge=info,tower_http=info\".into())
+                .unwrap_or_else(|_| "agent_bridge=info,tower_http=info".into())
         )
         .init();
 
     let tauri_host = std::env::var("TAURI_HOST")
-        .unwrap_or_else(|_| \"http://host.docker.internal:8081\".to_string());
+        .unwrap_or_else(|_| "http://host.docker.internal:8081".to_string());
 
     let state = AppState {
         agents: Arc::new(Mutex::new(HashMap::new())),
@@ -287,8 +308,8 @@ async fn main() {
         .route("/api/execute-tool", post(tool_exec_handler))
         .with_state(state);
 
-    let addr = \"0.0.0.0:8080\";
-    info!(address = %addr, \"Agent bridge starting\");
+    let addr = "0.0.0.0:8080";
+    info!(address = %addr, "Agent bridge starting");
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();

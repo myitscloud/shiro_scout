@@ -30,7 +30,7 @@ struct AgentSession {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = \"snake_case\")]
+#[serde(rename_all = "snake_case")]
 pub enum AgentStatus {
     Idle,
     Running,
@@ -118,7 +118,7 @@ async fn health_handler(State(state): State<AppState>) -> Json<HealthResponse> {
     let agents = state.agents.lock().await;
     let running = agents.values().filter(|a| a.status == AgentStatus::Running).count();
     Json(HealthResponse {
-        status: \"ok\".to_string(),
+        status: "ok".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         agents_running: running,
     })
@@ -139,7 +139,7 @@ async fn create_agent_handler(
     
     let mut agents = state.agents.lock().await;
     agents.insert(agent_id.clone(), session);
-    info!(agent_id = %agent_id, name = %req.name, \"Agent created\");
+    info!(agent_id = %agent_id, name = %req.name, "Agent created");
     
     Ok(Json(CreateAgentResponse {
         agent_id,
@@ -161,7 +161,7 @@ async fn run_agent_handler(
     
     // In production, this dispatches to AgentKit child process via ts-node
     // For now, return a stub result
-    info!(agent_id = %req.agent_id, prompt_len = %req.prompt.len(), \"Agent running\");
+    info!(agent_id = %req.agent_id, prompt_len = %req.prompt.len(), "Agent running");
     
     Ok(Json(RunAgentResponse {
         agent_id: req.agent_id,
@@ -181,7 +181,7 @@ async fn stop_agent_handler(
     
     session.status = AgentStatus::Stopped;
     session.updated_at = iso_timestamp();
-    info!(agent_id = %req.agent_id, \"Agent stopped\");
+    info!(agent_id = %req.agent_id, "Agent stopped");
     
     Ok(Json(StopAgentResponse {
         agent_id: req.agent_id,
@@ -209,7 +209,7 @@ async fn tool_exec_handler(
     State(state): State<AppState>,
     Json(req): Json<ToolExecRequest>,
 ) -> Result<Json<ToolExecResponse>, (StatusCode, String)> {
-    info!(tool = %req.tool, \"Tool execution requested\");
+    info!(tool = %req.tool, "Tool execution requested");
     
     // Forward tool execution to Tauri host via HTTP
     let client = reqwest::Client::new();
@@ -227,7 +227,7 @@ async fn tool_exec_handler(
             }
         }
         Err(e) => {
-            error!(error = %e, \"Failed to forward tool exec to Tauri host\");
+            error!(error = %e, "Failed to forward tool exec to Tauri host");
             Err((StatusCode::BAD_GATEWAY, format!("Tauri host unreachable: {}", e)))
         }
     }
@@ -266,12 +266,12 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| \"agent_bridge=info,tower_http=info\".into())
+                .unwrap_or_else(|_| "agent_bridge=info,tower_http=info".into())
         )
         .init();
 
     let tauri_host = std::env::var("TAURI_HOST")
-        .unwrap_or_else(|_| \"http://host.docker.internal:8081\".to_string());
+        .unwrap_or_else(|_| "http://host.docker.internal:8081".to_string());
 
     let state = AppState {
         agents: Arc::new(Mutex::new(HashMap::new())),
@@ -287,8 +287,8 @@ async fn main() {
         .route("/api/execute-tool", post(tool_exec_handler))
         .with_state(state);
 
-    let addr = \"0.0.0.0:8080\";
-    info!(address = %addr, \"Agent bridge starting\");
+    let addr = "0.0.0.0:8080";
+    info!(address = %addr, "Agent bridge starting");
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();

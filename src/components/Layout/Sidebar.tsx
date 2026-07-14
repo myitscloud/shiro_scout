@@ -93,6 +93,11 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
 
+      <div className={styles['sb-footer']}>
+        <button className={`btn secondary ${styles['new-session']}`} id="newSession" onClick={onNewSession}>＋ <span>New session</span></button>
+        <button className="btn icon ghost" id="railToggle" title="Collapse sidebar" aria-label="Collapse sidebar" onClick={onToggleRail}>⇤</button>
+      </div>
+
       <div className={styles.sessions} role="list" aria-label="Chat sessions">
         {Object.entries(groupedSessions).map(([group, items]) => (
           <React.Fragment key={group}>
@@ -120,11 +125,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             ))}
           </React.Fragment>
         ))}
-      </div>
-
-      <div className={styles['sb-footer']}>
-        <button className={`btn secondary ${styles['new-session']}`} id="newSession" onClick={onNewSession}>＋ <span>New session</span></button>
-        <button className="btn icon ghost" id="railToggle" title="Collapse sidebar" aria-label="Collapse sidebar" onClick={onToggleRail}>⇤</button>
       </div>
     </aside>
   );

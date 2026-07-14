@@ -9,14 +9,15 @@ use crate::llm::keychain::Keychain;
 // --------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AppSettings {
     pub theme: String,
     pub reduce_motion: bool,
     pub provider: String,
     pub model: String,
     pub api_key: String,
-    pub sandbox_on_launch: bool,
-    pub mount_workspace: bool,
+    #[serde(alias = "workspacePath")]
+    pub workspace_path: String,
     pub last_session_id: Option<String>,
     /// HITL confirmation timeout in seconds (default 30). Range: 5-120.
     pub hitl_timeout_secs: u32,
@@ -34,8 +35,7 @@ impl Default for AppSettings {
             provider: "local".to_string(),
             model: "gpt-4o".to_string(),
             api_key: String::new(),
-            sandbox_on_launch: true,
-            mount_workspace: true,
+            workspace_path: String::new(),
             last_session_id: None,
             hitl_timeout_secs: 30,
             dangerous_operations: DangerousOperationsConfig::default(),
@@ -52,6 +52,7 @@ impl Default for AppSettings {
 /// Configurable per Risk Level: Low, Medium, High, Critical.
 /// Each level determines the UI treatment (color, required checkbox, etc.).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct DangerousOperationsConfig {
     /// Operation names classified as Critical risk (requires checkbox + approval)
     pub critical: Vec<String>,

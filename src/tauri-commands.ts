@@ -31,6 +31,7 @@ export interface SandboxConfig {
   memory_mb: number;
   cpu_shares: number;
   network_mode: 'bridge' | 'none';
+  sandbox_air_gapped?: boolean;
 }
 
 export interface SandboxCreateResult {
@@ -40,23 +41,21 @@ export interface SandboxCreateResult {
 
 export interface AppSettings {
   theme: 'dark' | 'light';
+  workspacePath: string;
   reduce_motion: boolean;
   provider: 'local' | 'cloud';
   model: string;
   api_key: string;
-  sandbox_on_launch: boolean;
-  mount_workspace: boolean;
   last_session_id: string | null;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
+  workspacePath: 'C:\\projects',
   reduce_motion: false,
   provider: 'local',
   model: 'deepseek-v4-flash',
   api_key: '',
-  sandbox_on_launch: true,
-  mount_workspace: true,
   last_session_id: null,
 };
 
@@ -104,7 +103,12 @@ export async function pullImage(imageName: string): Promise<void> {
 
 /** Load saved settings from the app config directory. */
 export async function loadSettings(): Promise<AppSettings | null> {
-  return invoke<AppSettings | null>('load_settings');
+  const raw = await invoke<any>('load_settings');
+  if (raw) {
+    // Normalize Rust snake_case to TS camelCase (workspace_path -> workspacePath)
+    return { ...raw, workspacePath: raw.workspacePath || raw.workspace_path || '' } as AppSettings;
+  }
+  return null;
 }
 
 /** Save settings to the app config directory. */
@@ -285,4 +289,9 @@ export async function sendMessage(
       role: 'chat',
     },
   });
+}
+
+/** Send a message to the ShiroScout agent state machine. Runs tools (terminal, file, etc.) in the sandbox and returns the final response text. */
+export async function processAgentMessage(message: string): Promise<string> {
+  return invoke<string>('process_agent_message', { message });
 }

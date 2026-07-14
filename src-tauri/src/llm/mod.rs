@@ -81,6 +81,8 @@ pub struct StreamCompletionInput {
 pub struct StreamMessage {
     pub role: String,
     pub content: String,
+    pub name: Option<String>,
+    pub tool_call_id: Option<String>,
 }
 
 // --------------------------------------------------------------------------
@@ -148,7 +150,16 @@ pub async fn stream_llm_completion(
         api_messages.push(serde_json::json!({"role": "system", "content": system}));
     }
     for msg in &input.messages {
-        api_messages.push(serde_json::json!({"role": msg.role, "content": msg.content}));
+        let mut m = serde_json::Map::new();
+        m.insert("role".to_string(), serde_json::Value::String(msg.role.clone()));
+        m.insert("content".to_string(), serde_json::Value::String(msg.content.clone()));
+        if let Some(ref name) = msg.name {
+            m.insert("name".to_string(), serde_json::Value::String(name.clone()));
+        }
+        if let Some(ref tcid) = msg.tool_call_id {
+            m.insert("tool_call_id".to_string(), serde_json::Value::String(tcid.clone()));
+        }
+        api_messages.push(serde_json::Value::Object(m));
     }
 
     let request_body = serde_json::json!({

@@ -63,6 +63,16 @@ const BottomDrawer: React.FC<BottomDrawerProps> = ({
           <button className="btn icon ghost sm" id="drawerToggle" title="Collapse drawer" aria-label="Toggle drawer" onClick={onToggleCollapse}>{collapsed ? '▴' : '▾'}</button>
         </div>
       </div>
+      {collapsed && (
+        <button
+          className={styles.expandBtn}
+          title="Expand drawer"
+          aria-label="Expand drawer"
+          onClick={onToggleCollapse}
+        >
+          ?
+        </button>
+      )}
       {!collapsed && (
         <div className={styles.drawerBody}>
           <div className={`${styles.pane} ${activeTab === 'logs' ? styles.active : ''}`} id="pane-logs">

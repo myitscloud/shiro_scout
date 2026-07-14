@@ -1,0 +1,27 @@
+*Beautiful* output — this cracks the case, and there's a twist you'll enjoy. Three verdicts fall out of it:
+
+**1. Your Docker mount plumbing is completely healthy.** The running container sees `C:\projects` perfectly — `TTS-Coqui-ai` and your `test.txt` are right there, and that 9p/drvfs mount entry is exactly what a working Docker Desktop bind looks like. No WSL sharing bug, no path mangling — even the backslash `C:\projects` format sailed through fine. The infrastructure was never the problem.
+
+**2. F7 confirmed: the app has `workspace_path: ''`.** Every container *ShiroScout* creates gets **zero binds**, so its agents land in the empty image-layer `/workspace` decoy. That's your "they find /workspace but think nothing is in it," verbatim.
+
+**3. The twist: the container currently running was NOT created by your app.** Look at the fingerprints: `User: ''` (your `container.rs` sets `1000:1000`), `ReadonlyRootfs: False` (your code sets `true`), and a bind present despite the app's empty setting. That's your *manual test rig* — the one you made to prove Docker could see the folder. It proved that nicely… and it's now **squatting the `aegis-sandbox` name**, so the app's next `create_sandbox` will 409 (F6) even after you fix the setting.
+
+And there's a fourth finding hiding in section 4 that might explain *why* the workspace setting never stuck: your `settings.json` is **old-schema** — `sandbox_air_gapped` printed blank because the key doesn't exist in the file. `AppSettings` derives `Deserialize` with no `#[serde(default)]` on the newer fields, and serde hard-fails on missing fields — so the current build very likely can't parse your old settings file at all, silently falls back to defaults every launch, and your saved workspace evaporates. Let me fold both findings into the spec so your coding agent gets them:Oops — that edit ate the section 2 header. Repairing:Spec updated — F7 now marked **confirmed in production** with your evidence, and F11/W-A10 (the serde schema fix) added. Here's your path forward tonight, in order:
+
+**1. Test the schema theory (30 seconds).** Open the app, set the workspace path in Settings, save, then:
+```powershell
+Get-Content $env:APPDATA\com.shiroscout.app\settings.json
+```
+If `workspace_path` is now populated *and* you see `sandbox_air_gapped` in the file → save works, and the old-schema file was the whole reason it kept resetting. If it's still `''` → there's an additional save-path bug; grab the app's console output and bring it back verbatim.
+
+**2. Evict the squatter.** `docker rm -f aegis-sandbox` — your manual test container did its job (it proved the plumbing), but it's holding the name hostage from the app.
+
+**3. Recreate from the app**, then re-run `Diagnose-SandboxMount.ps1`. You want to see: exactly one container, a `/workspace` bind whose Source matches your setting, and section 3 listing your actual files. Bonus check: if `User` shows `'1000:1000'` and `ReadonlyRootfs: True`, your running build matches the `container.rs` you sent me. If they're *still* blank/false, your running app binary is older than your source — rebuild before drawing any more conclusions.
+
+**4. Then hand the coding agent W-A10 first** (the `#[serde(default)]` fix), because until that lands, every settings-schema change you make will re-brick existing installs — including yours, again, next week.
+
+Two loose threads I still want to tie off:
+
+**Which agents were failing?** Your prompt sits in `C:\Users\wayne\agent-zero\Shiro-Scout\...` — if the agents that "couldn't find the folder" were **Agent Zero's** (your dev agents in the Kali container) rather than ShiroScout's in-app agents, then no aegis-sandbox fix will ever help them: they live in a different container with different mounts, full stop. They'd need `C:\projects` (or wherever) mounted into the *Agent Zero* container.
+
+**And a path sanity check:** your test bind is `C:\projects` (containing TTS-Coqui-ai), but the ShiroScout project itself lives under `C:\Users\wayne\agent-zero\Shiro-Scout\usr\projects\shiro_scout`. When you set the workspace in the app for real, make sure you're pointing at the folder you actually want the agents working in — otherwise the next mystery will be "why are my agents refactoring my TTS experiments." 😄

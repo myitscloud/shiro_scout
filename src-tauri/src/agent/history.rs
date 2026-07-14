@@ -45,16 +45,19 @@ impl History {
 
     pub fn add_tool(&mut self, tool_name: &str, output: &str) {
         self.messages.push(Message {
-            role: "tool".into(),
-            content: format!("Tool {}: {}", tool_name, output),
+            // Use 'assistant' role instead of 'tool' because DeepSeek API requires
+            // tool_call_id for tool messages, and our simulated tool results don't
+            // participate in a tool_call chain. Assistant role avoids the validation.
+            role: "assistant".into(),
+            content: format!("[Tool {}]\n{}", tool_name, output),
             timestamp: Some(Utc::now().to_rfc3339()),
         });
     }
 
     pub fn add_warning(&mut self, msg: &str) {
         self.messages.push(Message {
-            role: "warning".into(),
-            content: msg.to_string(),
+            role: "system".into(),
+            content: format!("[Warning] {}", msg),
             timestamp: Some(Utc::now().to_rfc3339()),
         });
     }
@@ -70,12 +73,12 @@ impl History {
     }
 
     pub fn summary(&self) -> String {
-        format!("{} messages ({} user, {} assistant, {} tool, {} warning)",
+        format!("{} messages ({} user, {} assistant, {} tool, {} system)",
             self.messages.len(),
             self.messages.iter().filter(|m| m.role == "user").count(),
             self.messages.iter().filter(|m| m.role == "assistant").count(),
             self.messages.iter().filter(|m| m.role == "tool").count(),
-            self.messages.iter().filter(|m| m.role == "warning").count())
+            self.messages.iter().filter(|m| m.role == "system").count())
     }
 }
 

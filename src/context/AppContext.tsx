@@ -8,9 +8,7 @@ import {
   type TokenUsageEntry,
   type HITLEvent,
   type AgentStatusPayload,
-  type LlmSettings,
   DEFAULT_SETTINGS,
-  DEFAULT_LLM_SETTINGS,
   loadSettings as loadSettingsFromBackend,
   saveSettings as saveSettingsToBackend,
   getLlmSettings,
@@ -46,6 +44,28 @@ export function createEmptyTokenUsage(): TokenUsageState {
     byRole: { chat: { ...emptyRole }, utility: { ...emptyRole }, embedding: { ...emptyRole } },
     sessionTotal: { ...emptyRole },
   };
+}
+
+// ============================================================
+// Log and telemetry data structures
+// ============================================================
+
+export interface LogEntry {
+  id: string;
+  ts: string;
+  level: 'info' | 'tool' | 'warn' | 'err' | 'ok';
+  source: string;
+  message: string;
+}
+
+export interface TelemetryStat {
+  value: string;
+  label: string;
+}
+
+export interface BarItem {
+  label: string;
+  height: number;
 }
 
 // ============================================================
@@ -172,6 +192,17 @@ interface AppContextValue {
   /** Reset token usage for a new session. */
   resetTokenUsage: () => void;
 
+  /** Live log entries for the BottomDrawer Logs tab. */
+  logs: LogEntry[];
+  /** Add a log entry. */
+  addLog: (level: LogEntry['level'], source: string, message: string) => void;
+  /** Clear all log entries. */
+  clearLogs: () => void;
+  /** Computed telemetry stats for the Telemetry tab. */
+  telemetryStats: TelemetryStat[];
+  /** Computed tool-duration bars for the Telemetry tab. */
+  bars: BarItem[];
+
   // ============================================================
   // Streaming — conversation & real-time token state
   // ============================================================
@@ -237,13 +268,13 @@ export function useAppContext(): AppContextValue {
 
 const DEFAULT_AGENTS: AgentInfo[] = [
   { id: 'orchestrator', name: 'ShiroScout', avatar: '\u26a1', status: 'online', phase: '\u25cf', isThinking: false },
-  { id: 'architect', name: 'Windows Architect', avatar: '\u2699', status: 'off', phase: '\u25cf', isThinking: false },
-  { id: 'frontend', name: 'Frontend Engineer', avatar: '\u2728', status: 'off', phase: '\u25cf' },
-  { id: 'security', name: 'Security Engineer', avatar: '\u274c', status: 'off', phase: '\u25cf' },
-  { id: 'qa', name: 'QA Engineer', avatar: '\u2661', status: 'off', phase: '\u25cf' },
-  { id: 'docs', name: 'Docs Engineer', avatar: '\u2714', status: 'off', phase: '\u25cf' },
-  { id: 'devops', name: 'Release/DevOps', avatar: '\u267b', status: 'off', phase: '\u25cf' },
-  { id: 'reviewer', name: 'Code Reviewer', avatar: '\u272f', status: 'off', phase: '\u25cf' },
+  { id: 'architect', name: 'Windows Architect', avatar: '🏰', status: 'off', phase: '\u25cf', isThinking: false },
+  { id: 'frontend', name: 'Frontend Engineer', avatar: '🎨', status: 'off', phase: '\u25cf' },
+  { id: 'security', name: 'Security Engineer', avatar: '🛡️', status: 'off', phase: '\u25cf' },
+  { id: 'qa', name: 'QA Engineer', avatar: '📊', status: 'off', phase: '\u25cf' },
+  { id: 'docs', name: 'Docs Engineer', avatar: '✍️', status: 'off', phase: '\u25cf' },
+  { id: 'devops', name: 'Release/DevOps', avatar: '🚀', status: 'off', phase: '\u25cf' },
+  { id: 'reviewer', name: 'Code Reviewer', avatar: '⚖️', status: 'off', phase: '\u25cf' },
 ];
 
 export const DEFAULT_SESSIONS: SessionInfo[] = [];
@@ -337,6 +368,19 @@ export function AppProvider({ children }: AppProviderProps) {
   const resetTokenUsage = useCallback(() => {
     setTokenUsage(createEmptyTokenUsage());
   }, []);
+
+  // ============================================================
+  // Log state for BottomDrawer
+  // ============================================================
+
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const logIdRef = useRef(0);
+  const addLog = useCallback((level: LogEntry['level'], source: string, message: string) => {
+    const id = `log-${++logIdRef.current}`;
+    const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
+    setLogs(prev => [...prev.slice(-199), { id, ts, level, source, message }]);
+  }, []);
+  const clearLogs = useCallback(() => setLogs([]), []);
 
   // ============================================================
   // Streaming state
@@ -635,6 +679,34 @@ export function AppProvider({ children }: AppProviderProps) {
     };
   }, [updateAgentStatus]);
 
+  // ============================================================
+  // Computed telemetry & bars for BottomDrawer
+  // ============================================================
+
+  const telemetryStats: TelemetryStat[] = [
+    { value: String(agents.length), label: 'Agents' },
+    { value: String(sessions.length), label: 'Sessions' },
+    { value: `${tokenUsage.sessionTotal.total_tokens}`, label: 'Tokens Used' },
+    { value: messages.filter(m => m.role === 'assistant').length.toString(), label: 'Messages' },
+  ];
+
+  const bars: BarItem[] = [
+    { label: 'LLM', height: Math.min(48, Math.max(4, tokenUsage.sessionTotal.total_tokens > 0 ? Math.round(tokenUsage.sessionTotal.total_tokens / 100) : 4)) },
+    { label: 'SSE', height: 12 },
+    { label: 'IPC', height: 8 },
+    { label: 'UI', height: 6 },
+    { label: 'FS', height: 4 },
+  ];
+
+  // Auto-log token usage events
+  useEffect(() => {
+    if (tokenUsage.sessionTotal.total_tokens > 0) {
+      const lastUpdate = tokenUsage.sessionTotal;
+      addLog('info', 'llm', `Tokens: ${lastUpdate.total_tokens} (${lastUpdate.prompt_tokens} prompt + ${lastUpdate.completion_tokens} completion)`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokenUsage.sessionTotal.total_tokens]);
+
   const value: AppContextValue = {
     dockerInfo,
     refreshDockerStatus,
@@ -666,6 +738,13 @@ export function AppProvider({ children }: AppProviderProps) {
     updateTokenUsage,
     resetTokenUsage,
 
+    // Log & Telemetry
+    logs,
+    addLog,
+    clearLogs,
+    telemetryStats,
+    bars,
+
     // Streaming
     messages,
     streamingMessage,
@@ -688,4 +767,6 @@ export function AppProvider({ children }: AppProviderProps) {
     </AppContext.Provider>
   );
 }
+
+
 

@@ -1,8 +1,8 @@
 .app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh}
 .workspace{display:flex;flex:1;min-height:0}
 
-.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative;overflow:hidden}
-.main :global(.thread){flex:1;overflow-y:auto;min-height:0}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative;overflow:hidden;padding:8px 16px 0}
+.main :global(.thread){flex:1;overflow-y:auto;min-height:0;padding:0 20px}
 .main :global(.chat-input){flex-shrink:0}
 
 .chat-input{padding:0 20px 10px}

@@ -186,7 +186,14 @@ impl Agent {
     async fn think_with_streaming(&self, app_handle: &AppHandle) -> AgentResult<String> {
         let provider_name = &self.context.provider.name;
         let model = &self.context.provider.model;
-        let api_key = self.context.provider.api_key.as_deref().unwrap_or("");
+        let api_key = match &self.context.provider.api_key {
+            Some(k) if !k.is_empty() => k.clone(),
+            _ => {
+                let mut kc = crate::llm::keychain::Keychain::new(None);
+                kc.load_api_key(&self.context.provider.name)
+                    .unwrap_or_default()
+            }
+        };
         let base_url = self.context.provider.base_url.clone();
         let max_tokens = self.context.provider.max_tokens;
         let temperature = self.context.provider.temperature;
@@ -194,8 +201,13 @@ impl Agent {
         let system_prompt = self.system_prompt.as_deref().unwrap_or("You are a helpful AI assistant.");
         let messages: Vec<StreamMessage> = self.context.history.messages.iter().map(|m| {
             StreamMessage {
-                role: m.role.clone(),
+                role: match m.role.as_str() {
+                    "user" | "assistant" | "system" => m.role.clone(),
+                    _ => "system".to_string(),
+                },
                 content: m.content.clone(),
+                name: None,
+                tool_call_id: None,
             }
         }).collect();
 
@@ -224,7 +236,10 @@ impl Agent {
             api_messages.push(serde_json::json!({"role": "system", "content": system}));
         }
         for msg in &input.messages {
-            api_messages.push(serde_json::json!({"role": msg.role, "content": msg.content}));
+            let mut m = serde_json::Map::new();
+            m.insert("role".to_string(), serde_json::Value::String(msg.role.clone()));
+            m.insert("content".to_string(), serde_json::Value::String(msg.content.clone()));
+            api_messages.push(serde_json::Value::Object(m));
         }
 
         let request_body = serde_json::json!({

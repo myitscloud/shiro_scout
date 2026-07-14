@@ -1,0 +1,89 @@
+# Build CI for ShiroScout
+# Runs on every push/PR to main: audit, check, build, verify
+# D1: CI runs on Windows runners
+# D3: Releases build from a clean, tagged tree
+name: Build CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  audit:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+      - name: License audit
+        run: cargo deny check licenses
+      - name: Advisory audit
+        run: cargo deny check advisories
+
+  build:
+    runs-on: windows-latest
+    needs: [audit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build frontend
+        run: pnpm build
+      - name: Check Rust (debug)
+        run: cargo check
+      - name: Build Rust (release)
+        run: cargo build --release
+      - name: Verify binary exists
+        run: |
+          if (Test-Path "src-tauri/target/release/shiro-scout.exe") {
+            Write-Output "Binary exists"
+          } else {
+            Write-Error "Binary not found"
+            exit 1
+          }
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: shiro-scout-release
+          path: src-tauri/target/release/shiro-scout.exe
+          retention-days: 7
+
+  sbom:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+      - name: Generate CycloneDX SBOM
+        run: cargo deny output cyclonedx -f sbom.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          retention-days: 30

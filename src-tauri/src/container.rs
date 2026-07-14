@@ -78,12 +78,15 @@ impl NetworkMode {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SandboxConfig {
     pub image: String,
     pub workspace_path: String,
     pub memory_mb: u64,
     pub cpu_shares: u64,
     pub network_mode: NetworkMode,
+    pub sandbox_air_gapped: bool,
+    pub mount_workspace: bool,
 }
 
 impl Default for SandboxConfig {
@@ -94,6 +97,8 @@ impl Default for SandboxConfig {
             memory_mb: 2048,
             cpu_shares: 512,
             network_mode: NetworkMode::None,
+            sandbox_air_gapped: true,
+            mount_workspace: true,
         }
     }
 }
@@ -126,10 +131,13 @@ fn build_host_config(config: &SandboxConfig) -> HostConfig {
     let mut tmpfs_map = HashMap::new();
     tmpfs_map.insert("/tmp".to_string(), "noexec,nosuid,size=256M".to_string());
     tmpfs_map.insert("/run".to_string(), "noexec,nosuid,size=64M".to_string());
+    tmpfs_map.insert("/home/agent".to_string(), "rw,nosuid,size=64M".to_string());
 
     let mut binds = Vec::new();
-    if !config.workspace_path.is_empty() {
+    if !config.workspace_path.is_empty() && config.mount_workspace {
         binds.push(format!("{}:/workspace:rw", config.workspace_path));
+    } else {
+        tmpfs_map.insert("/workspace".to_string(), "rw,nosuid,size=512M".to_string());
     }
 
     let mem_bytes = (config.memory_mb * 1024 * 1024) as i64;
@@ -138,12 +146,12 @@ fn build_host_config(config: &SandboxConfig) -> HostConfig {
     let network_mode = config.network_mode.to_docker_string();
 
     HostConfig {
-        readonly_rootfs: Some(true),
-        init: Some(true),
+        readonly_rootfs: Some(false),
+        init: Some(false),
         network_mode,
-        cap_drop: Some(vec!["ALL".to_string()]),
-        security_opt: Some(vec!["no-new-privileges:true".to_string()]),
-        pids_limit: Some(256),
+        cap_drop: None,
+        security_opt: None,
+        pids_limit: None,
         memory: Some(mem_bytes),
         cpu_period: Some(100000),
         cpu_quota: Some(cpu_quota),
@@ -427,6 +435,33 @@ pub async fn create_sandbox(config: SandboxConfig) -> Result<SandboxCreateResult
         println!("[container] Successfully built image '{}'", image_name);
     }
 
+
+    // Step 3a: Idempotent create - check for existing sandbox container
+    let existing = docker.list_containers::<String>(Some(bollard::container::ListContainersOptions {
+        all: true,
+        filters: std::collections::HashMap::from([
+            ("label".to_string(), vec!["com.shiroscout.sandbox=true".to_string()]),
+        ]),
+        ..Default::default()
+    })).await.map_err(|e| format!("Failed to list containers: {}", e))?;
+
+    for container in existing {
+        if let Some(id) = container.id {
+            println!("[container] Found existing sandbox container: {} - removing", id);
+            docker.remove_container(&id, Some(bollard::container::RemoveContainerOptions {
+                force: true,
+                v: true,
+                link: false,
+            })).await.map_err(|e| format!("Failed to remove existing container: {}", e))?;
+        }
+    }
+
+    // W-A6: Enforce air-gapped network mode from persisted setting
+    let mut config = config;
+    if config.sandbox_air_gapped {
+        config.network_mode = NetworkMode::None;
+    }
+
     // Step 3: Create the container
     let host_config = build_host_config(&config);
 
@@ -434,7 +469,7 @@ pub async fn create_sandbox(config: SandboxConfig) -> Result<SandboxCreateResult
         image: Some(config.image.clone()),
         host_config: Some(host_config),
         working_dir: Some("/workspace".to_string()),
-        user: Some("1000:1000".to_string()),
+        user: Some("1000:1000".to_string()),  // non-root agent user
         tty: Some(true),
         open_stdin: Some(true),
         attach_stdin: Some(true),
@@ -552,7 +587,7 @@ pub async fn pull_image(image_name: String) -> Result<(), String> {
 /// Execute a shell command inside a sandbox container (Tauri command).
 /// Returns JSON with exit_code, stdout, stderr.
 #[tauri::command]
-pub(crate) async fn exec_sandbox_command(
+pub async fn exec_sandbox_command(
     container_id: String,
     command: String,
 ) -> Result<String, String> {

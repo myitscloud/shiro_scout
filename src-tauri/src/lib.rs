@@ -18,13 +18,80 @@ pub mod tools;
 use agent::persistence::{restore_or_default, AppAgentState};
 use serde::Serialize;
 use std::sync::Mutex;
+use std::sync::OnceLock;
 use tauri::Emitter;
 use tauri::Manager;
 
+use crate::agent::agent::Agent;
+use crate::bridge_client::ToolExecBridge;
+
 // --------------------------------------------------------------------------
-// Agent Bridge IPC commands (Wave 3.3)
-// Proxies to the Docker sandbox bridge on port 8080
+// Global agent instance for the inline orchestrator
+// Preserves conversation history across chat turns.
 // --------------------------------------------------------------------------
+
+static AGENT_INSTANCE: OnceLock<Mutex<Option<(Agent, String)>>> = OnceLock::new();
+
+fn get_agent_mutex() -> &'static Mutex<Option<(Agent, String)>> {
+    AGENT_INSTANCE.get_or_init(|| Mutex::new(None))
+}
+
+/// Process a user message through the ShiroScout agent state machine.
+/// The agent calls the LLM, parses JSON tool calls, executes them in
+/// the sandbox via ToolExecBridge, and returns the final response.
+/// Conversation history persists across calls.
+#[tauri::command]
+async fn process_agent_message(
+    app_handle: tauri::AppHandle,
+    message: String,
+) -> Result<String, String> {
+    // Take the agent out of storage
+    let mut agent_tuple: Option<(Agent, String)> = {
+        let lock = get_agent_mutex();
+        let mut guard = lock.lock().map_err(|e| format!("Lock error: {}", e))?;
+        guard.take()
+    };
+
+    let (mut agent, cid) = if let Some((ag, id)) = agent_tuple.take() {
+        // Reuse existing agent
+        (ag, id)
+    } else {
+        // Create fresh agent
+        let mut a = Agent::new_orchestrator().await;
+        a.system_prompt = Some(
+            "You are ShiroScout, an autonomous AI engineering agent with tool execution capability.\n\
+             You can execute shell commands in the sandbox container by returning a JSON tool call:\n\
+             {\"tool_name\": \"terminal\", \"tool_args\": {\"command\": \"<shell command>\"}}\n\n\
+             Rules:\n- When the user asks to read/list/show files or run commands, call the terminal tool.\n- When asked to create/edit/write files, call the terminal tool with appropriate shell commands.\n- After a tool call returns output, use it to formulate your response in natural language.\n- For conversation or questions that don't need tools, respond directly in plain text.\n- Always respond in the same language as the user's message.".to_string()
+        );
+        a.app_handle = Some(app_handle.clone());
+        let cid = "aegis-sandbox".to_string();
+        let bridge = ToolExecBridge::new(cid.clone());
+        a.tools = a.tools.with_bridge(bridge);
+        (a, cid)
+    };
+
+    // Process the message through the agent state machine
+    let result = agent.process_message(&message).await;
+
+    // Store the agent back for the next call
+    {
+        let lock = get_agent_mutex();
+        let mut guard = lock.lock().map_err(|e| format!("Lock error: {}", e))?;
+        *guard = Some((agent, cid));
+    }
+
+    match result {
+        Ok(response) => Ok(response),
+        Err(e) => Err(format!("{}", e)),
+    }
+}
+
+//// --------------------------------------------------------------------------
+//// Agent Bridge IPC commands (Wave 3.3)
+//// Proxies to the Docker sandbox bridge on port 8080
+//// --------------------------------------------------------------------------
+//// --------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AgentStatusPayload {
@@ -81,7 +148,7 @@ async fn set_agent_status(app_handle: tauri::AppHandle, agent_id: String, status
 /// Entry point for the Tauri 2 application.
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_shell::init()).plugin(tauri_plugin_dialog::init()).plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Auto-restore agent state from disk on app startup
             let ctx = restore_or_default(app.handle());
@@ -127,6 +194,8 @@ pub fn run() {
             crate::container::remove_sandbox,
             crate::container::pull_image,
             crate::container::exec_sandbox_command,
+            // Inline Agent (ShiroScout)
+            process_agent_message,
             // Agent Bridge (Wave 3.3)
             sandbox_health,
             create_agent,
@@ -158,3 +227,4 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+

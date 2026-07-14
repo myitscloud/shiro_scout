@@ -20,8 +20,6 @@ export interface RightPanelProps {
   recentTools?: RecentTool[];
   costSession?: string;
   costDetail?: string;
-  onViewConfig?: () => void;
-  onKillAgent?: () => void;
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
@@ -42,8 +40,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
   ],
   costSession = '$0.00 (local)',
   costDetail = 'disabled',
-  onViewConfig,
-  onKillAgent,
 }) => {
   const tokenPct = Math.round((tokensUsed / tokenLimit) * 100);
 
@@ -77,10 +73,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
         <h4>Cost estimate</h4>
         <div className={styles.kv}><span>This session</span><b>{costSession}</b></div>
         <div className={styles.kv}><span>Cloud fallback</span><b>{costDetail}</b></div>
-      </div>
-      <div className={styles['rp-actions']}>
-        <button className="btn secondary" onClick={onViewConfig}>⚙ View agent config</button>
-        <button className="btn danger" id="killBtn" onClick={onKillAgent}>■ Kill agent</button>
       </div>
     </aside>
   );

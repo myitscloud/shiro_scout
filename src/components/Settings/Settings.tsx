@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { saveLlmSettings } from '../../tauri-commands';
+import { open } from '@tauri-apps/plugin-dialog';
 import LLMProviderSettings from './LLMProviderSettings';
 import styles from '../Overlay/Modal.module.css';
 
@@ -10,16 +11,16 @@ export interface SettingsProps {
 }
 
 const SettingsView: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
-  const { settings, updateSettings, llmConfig } = useAppContext();
+  const { settings, updateSettings, llmConfig, stopContainer, createContainer, startContainer, removeContainer, refreshDockerStatus } = useAppContext();
 
   const [theme, setTheme] = useState<'dark' | 'light'>(settings.theme);
   const [reduceMotion, setReduceMotion] = useState(settings.reduce_motion);
   const [provider, setProvider] = useState<'local' | 'cloud'>(settings.provider);
   const [model, setModel] = useState(settings.model);
   const [apiKey, setApiKey] = useState(settings.api_key);
-  const [sandboxOnLaunch, setSandboxOnLaunch] = useState(settings.sandbox_on_launch);
-  const [mountWorkspace, setMountWorkspace] = useState(settings.mount_workspace);
+  const [workspacePath, setWorkspacePath] = useState(settings.workspacePath);
   const [activeTab, setActiveTab] = useState<'general' | 'llm'>('general');
+  const [restarting, setRestarting] = useState(false);
 
   // Sync local state when settings change from context
   useEffect(() => {
@@ -28,19 +29,17 @@ const SettingsView: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     setProvider(settings.provider);
     setModel(settings.model);
     setApiKey(settings.api_key);
-    setSandboxOnLaunch(settings.sandbox_on_launch);
-    setMountWorkspace(settings.mount_workspace);
+    setWorkspacePath(settings.workspacePath);
   }, [settings]);
 
   const handleSave = async () => {
     await updateSettings({
       theme,
+      workspacePath,
       reduce_motion: reduceMotion,
       provider,
       model,
       api_key: apiKey,
-      sandbox_on_launch: sandboxOnLaunch,
-      mount_workspace: mountWorkspace,
     });
 
     // Also persist LLM provider config (including API keys) to disk
@@ -68,10 +67,76 @@ const SettingsView: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     setProvider(settings.provider);
     setModel(settings.model);
     setApiKey(settings.api_key);
-    setSandboxOnLaunch(settings.sandbox_on_launch);
-    setMountWorkspace(settings.mount_workspace);
+    setWorkspacePath(settings.workspacePath);
     onClose();
   };
+
+  const handleBrowse = useCallback(async () => {
+    const selected = await open({ directory: true, multiple: false, title: 'Select Workspace Folder' });
+    if (selected) {
+      setWorkspacePath(selected);
+    }
+  }, []);
+
+  const handleApplyRestart = useCallback(async () => {
+    setRestarting(true);
+    try {
+      // Persist workspace path first
+      await updateSettings({
+        theme,
+        workspacePath,
+        reduce_motion: reduceMotion,
+        provider,
+        model,
+        api_key: apiKey,
+      });
+
+      // Stop existing sandbox if running
+      const containerId = 'aegis-sandbox';
+      try {
+        console.log('[Settings] Stopping container:', containerId);
+        await stopContainer(containerId);
+        console.log('[Settings] Container stopped successfully');
+        // Small delay to let container stop
+        await new Promise(r => setTimeout(r, 500));
+      } catch (stopErr) {
+        console.warn('[Settings] StopContainer failed (may already be stopped):', stopErr);
+      }
+
+      // Remove the old container to avoid 409 Conflict on re-create
+      try {
+        console.log('[Settings] Removing container:', containerId);
+        await removeContainer(containerId);
+        console.log('[Settings] Container removed successfully');
+      } catch (removeErr) {
+        console.warn('[Settings] RemoveContainer failed (may not exist):', removeErr);
+      }
+
+      // Create new sandbox with updated workspace path
+      console.log('[Settings] Creating container with workspace:', workspacePath);
+      await createContainer({
+        image: 'aegis-sandbox:latest',
+        workspace_path: workspacePath || '',
+        memory_mb: 2048,
+        cpu_shares: 512,
+        network_mode: 'none',
+      });
+      console.log('[Settings] Container created successfully');
+
+      // Start it
+      console.log('[Settings] Starting container:', containerId);
+      await startContainer(containerId);
+      console.log('[Settings] Container started successfully');
+
+      // Refresh Docker status so UI updates
+      await refreshDockerStatus();
+      console.log('[Settings] Docker status refreshed');
+    } catch (e) {
+      console.error('[Settings] Failed to restart sandbox with new workspace path:', e);
+    } finally {
+      setRestarting(false);
+    }
+  }, [theme, workspacePath, reduceMotion, provider, model, apiKey, updateSettings, stopContainer, createContainer, startContainer, refreshDockerStatus]);
 
   if (!isOpen) return null;
 
@@ -147,8 +212,44 @@ const SettingsView: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
         </div>
         <div className={styles.field}>
           <label>Sandbox</label>
-          <label className={styles.check}><input type="checkbox" checked={sandboxOnLaunch} onChange={e => setSandboxOnLaunch(e.target.checked)} /> Start Docker sandbox on launch</label>
-          <label className={styles.check}><input type="checkbox" checked={mountWorkspace} onChange={e => setMountWorkspace(e.target.checked)} /> Mount /workspace read-write</label>
+
+        </div>
+        <div className={styles.field}>
+          <label>📁 Workspace</label>
+          <div style={{fontSize:'11.5px',color:'var(--text-muted)',marginBottom:'6px'}}>Path where the sandbox can access files</div>
+          <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+            <input
+              className={styles.input}
+              type="text"
+              value={workspacePath}
+              onChange={e => setWorkspacePath(e.target.value)}
+              placeholder="C:\Projects"
+              aria-label="Workspace folder path"
+              style={{flex:1}}
+            />
+            <button
+              className="btn secondary"
+              onClick={handleBrowse}
+              style={{padding:'5px 12px',fontSize:'12px',whiteSpace:'nowrap'}}
+            >
+              Browse…
+            </button>
+          </div>
+          <div style={{display:'flex',gap:'8px',marginTop:'8px',alignItems:'center'}}>
+            <button
+              className="btn secondary"
+              onClick={handleApplyRestart}
+              disabled={restarting}
+              style={{padding:'5px 12px',fontSize:'12px',cursor:restarting?'wait':'pointer'}}
+            >
+              {restarting ? 'Restarting…' : 'Apply & Restart Sandbox'}
+            </button>
+          </div>
+          <div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'6px'}}>
+            {workspacePath
+              ? `Current: ${workspacePath}`
+              : 'Current: No workspace set'}
+          </div>
         </div>
         <div className={styles.foot}>
           <button className="btn ghost" onClick={handleCancel}>Cancel</button>
