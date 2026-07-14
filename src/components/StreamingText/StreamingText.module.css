@@ -5,6 +5,8 @@
   50%      { opacity: 1;   text-shadow: 0 0 8px var(--accent-purple-glow); }
 }
 
+/* ── Wrapper ────────────────────────────────────────────── */
+
 .wrapper {
   position: relative;
   line-height: 1.6;
@@ -19,6 +21,8 @@
   display: inline;
 }
 
+/* ── Breathing Cursor ──────────────────────────────────── */
+
 .cursor {
   display: inline-block;
   width: 8px;
@@ -30,34 +34,124 @@
   animation: cursorBreath 1.8s ease-in-out infinite;
 }
 
-.markdownContent {
-  display: inline;
+.cursorTerminal {
+  background: #22c55e;  /* Green cursor inside terminal blocks */
 }
 
-.markdownContent p {
-  margin: 0;
-  display: inline;
+/* ── Completed Markdown Body ────────────────────────────── */
+
+.markdownBody {
+  line-height: 1.7;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--text-primary);
+  word-break: break-word;
 }
 
-.markdownContent code {
-  font-family: var(--font-mono);
+.markdownBody p {
+  margin: 0 0 10px;
+}
+
+.markdownBody p:last-child {
+  margin-bottom: 0;
+}
+
+.markdownBody ul,
+.markdownBody ol {
+  margin: 6px 0;
+  padding-left: 24px;
+}
+
+.markdownBody li {
+  margin: 3px 0;
+}
+
+.markdownBody table {
+  border-collapse: collapse;
+  margin: 10px 0;
   font-size: 13px;
-  color: var(--text-code);
-  background: rgba(255, 255, 255, 0.06);
-  padding: 1px 4px;
-  border-radius: 3px;
+  width: 100%;
 }
 
-.markdownContent strong {
+.markdownBody th,
+.markdownBody td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.markdownBody th {
+  background: rgba(139, 92, 246, 0.15);
+  font-weight: 600;
+}
+
+.markdownBody strong {
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.markdownContent em {
+.markdownBody em {
   font-style: italic;
 }
 
-/* Reduced motion */
+/* ── Inline Code ────────────────────────────────────────── */
+
+.inlineCode {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-code);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* ── Code Blocks (```fences) ────────────────────────────── */
+
+.codeBlock {
+  margin: 12px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: #0D0D0F;
+}
+
+.codeBlockHeader {
+  display: flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: rgba(139, 92, 246, 0.1);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.codeBlockLang {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--accent-purple);
+}
+
+.codeBlockPre {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Menlo', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #E8E8E8;
+  white-space: pre;
+}
+
+/* Terminal-specific pre: add $ prompt styling */
+.terminalPre {
+  background: #0a0a0c;
+  border-left: 3px solid #22c55e;
+}
+
+/* ── Reduced Motion ─────────────────────────────────────── */
+
 @media (prefers-reduced-motion: reduce) {
   .cursor {
     animation: none;

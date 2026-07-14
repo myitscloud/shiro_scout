@@ -403,6 +403,22 @@ impl Agent {
             }
         }
 
+        // Fallback: extract JSON object from within natural language text
+        // The LLM often returns "Yes I can... {\"tool_name\": \"terminal\", ...}"
+        if let Some(open_brace) = response.find('{') {
+            if let Some(close_brace) = response[open_brace..].rfind('}') {
+                let json_str = &response[open_brace..=open_brace + close_brace];
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
+                    if let Some(obj) = val.as_object() {
+                        if let Some(tn) = obj.get("tool_name").and_then(|v| v.as_str()) {
+                            let tool_args = obj.get("tool_args").cloned().unwrap_or(serde_json::Value::Null);
+                            return Ok(Ok((tn.to_string(), tool_args)));
+                        }
+                    }
+                }
+            }
+        }
+
         // Fallback: `passe tool_name arg1 val1`
         if let Some(passed) = response.strip_prefix("passe ") {
             let parts: Vec<&str> = passed.split_whitespace().collect();

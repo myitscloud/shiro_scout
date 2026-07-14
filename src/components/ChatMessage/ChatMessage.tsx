@@ -49,9 +49,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
   /**
    * Render the content area.
-   * - Agent messages that are streaming → use StreamingText with real tokens.
-   * - Agent messages that have completed → render full content as text.
-   * - User/system messages → render as plain text or ReactNode.
+   * - Agent messages (streaming or completed) → use StreamingText.
+   *   Streaming shows raw text + cursor; completed renders markdown.
+   * - User messages → render as plain text with mono font.
    * - Non-string content (ReactNode) → render directly.
    */
   const renderContent = () => {
@@ -60,8 +60,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       return content;
     }
 
-    // Agent variant + streaming = use StreamingText
-    if (variant === 'agent' && isStreaming) {
+    // Agent messages always use StreamingText (renders markdown when complete)
+    if (variant === 'agent') {
       return (
         <StreamingText
           content={content}
@@ -70,7 +70,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       );
     }
 
-    // Simple text rendering for complete messages or user/system messages
+    // User/system messages → plain text or ReactNode
     return <p>{content}</p>;
   };
 

@@ -1,35 +1,31 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import styles from './StreamingText.module.css';
 
 export interface StreamingTextProps {
-  /**
-   * The current accumulated text to display.
-   * During streaming this grows token-by-token from IPC events;
-   * on completion it contains the full message.
-   */
   content: string;
   /** Whether the LLM is still emitting tokens. When true, show breathing cursor. */
   isStreaming: boolean;
-  /** Called on stream completion (kept for backward compatibility). */
+  /** Called on stream completion. */
   onComplete?: (text: string) => void;
 }
 
 /**
  * Renders streaming LLM output token-by-token as it arrives via props.
  *
- * Previously this component used a simulated setInterval-based typing effect.
- * Now it displays the real accumulated text directly — tokens arrive from the
- * Rust `llm-token` Tauri event and are rendered immediately via `content`.
+ * - While streaming: raw text + breathing cursor.
+ * - On completion: renders full content through ReactMarkdown (code blocks,
+ *   lists, bold, emojis, tables, etc.) with custom code block styling.
  *
- * The breathing cursor animation (Steady Cursor) is shown only while
- * `isStreaming` is true.
+ * Code fences (```terminal, ```json, etc.) render as styled `<pre>`
+ * blocks with a language badge.
  */
 const StreamingText: React.FC<StreamingTextProps> = ({
   content,
   isStreaming,
   onComplete,
 }) => {
-  // Notify onComplete once when streaming finishes and content is present
   const completedRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -38,18 +34,78 @@ const StreamingText: React.FC<StreamingTextProps> = ({
       onComplete?.(content);
     }
     if (isStreaming) {
-      // Reset flag when a new stream starts
       completedRef.current = false;
     }
   }, [isStreaming, content, onComplete]);
 
-  return (
-    <span className={styles.wrapper}>
-      <span className={isStreaming ? styles.content : styles.markdownContent}>
-        {content}
+  // Detect if we're inside a code fence during streaming for cursor placement
+  const cursorInsideCodeBlock = useMemo(() => {
+    if (!isStreaming) return false;
+    const trimmed = content.trimEnd();
+    const fenceOpeners = trimmed.match(/```/g);
+    const count = fenceOpeners ? fenceOpeners.length : 0;
+    // Odd counts mean we're inside a code block
+    return count % 2 === 1;
+  }, [content, isStreaming]);
+
+  // During streaming: render raw text with cursor
+  if (isStreaming) {
+    return (
+      <span className={styles.wrapper}>
+        <span className={styles.content}>
+          {content}
+        </span>
+        <span
+          className={`${styles.cursor} ${cursorInsideCodeBlock ? styles.cursorTerminal : ''}`}
+        />
       </span>
-      {isStreaming && <span className={styles.cursor} />}
-    </span>
+    );
+  }
+
+  // Completed content: render via ReactMarkdown with custom components
+  return (
+    <div className={styles.markdownBody}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          // Custom code block renderer for ```fenced blocks
+          code({ className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || '');
+            const lang = match ? match[1] : '';
+            const codeStr = String(children).replace(/\n$/, '');
+
+            // Multi-line code fence → terminal block
+            if (codeStr.includes('\n') || lang) {
+              return (
+                <div className={styles.codeBlock}>
+                  {lang && (
+                    <div className={styles.codeBlockHeader}>
+                      <span className={styles.codeBlockLang}>{lang}</span>
+                    </div>
+                  )}
+                  <pre className={`${styles.codeBlockPre} ${lang === 'terminal' ? styles.terminalPre : ''}`}>
+                    <code className={className}>{children}</code>
+                  </pre>
+                </div>
+              );
+            }
+
+            // Inline code
+            return (
+              <code className={styles.inlineCode} {...props}>
+                {children}
+              </code>
+            );
+          },
+          // Custom pre — wrapped by code component above, so empty
+          pre({ children }) {
+            return <>{children}</>;
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
   );
 };
 
