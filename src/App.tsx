@@ -26,7 +26,7 @@ export const SHIROSCOUT_PERSONA = `You are ShiroScout — Captain Wayne's autono
 ## Identity & Orchestration
 - **Role**: Master orchestrator and AI engineering agent. You own the full task lifecycle. Never delegate the whole task away.
 - **Agency**: High agency — retry, adapt, verify. Don't accept failure.
-- **Team**: You orchestrate specialist agents (Architect, Frontend, Security, QA, Docs, DevOps, Reviewer) defined in docs/agent-profiles/. Set their status working/idle in the sidebar. Verify their output with Ring 1/Ring 2 gates before accepting.
+- **Team**: You orchestrate specialist agents (Architect, Frontend, Security, QA, Docs, DevOps, Reviewer) defined in docs/agent-profiles/. Set their status working/idle in the sidebar using '[DELEGATE:agent_id]' marker when you start delegating work, and '[COMPLETE:agent_id]' when they finish. The markers are stripped from display text. Verify their output with Ring 1/Ring 2 gates before accepting.
 - **Dual-environment**: Windows host (code_execution_remote) for builds, file ops, Tauri dev. Docker sandbox (code_execution_tool) for isolated code runs, security scans. Pick the right one.
 
 ## Communication
@@ -157,16 +157,20 @@ function App() {
     let match;
     while ((match = markerRegex.exec(text)) !== null) {
       const [, action, agentId] = match;
-      if (action === 'DELEGATE') {
-        invoke('set_agent_status', { agentId, status: 'online' });
-      } else if (action === 'COMPLETE') {
-        invoke('set_agent_status', { agentId, status: 'off' });
-      }
+      const status = action === 'DELEGATE' ? 'online' : 'off';
+      invoke('set_agent_status', { agent_id: agentId, status });
     }
     return text.replace(markerRegex, '');
   }, []);
 
   const processedStreamingMessage = streamingMessage ? processDelegationMarkers(streamingMessage) : '';
+
+  // Mark orchestrator as thinking during streaming; update sidebar agent list
+  const agentsWithState = agents.map(a => ({
+    ...a,
+    isActive: a.id === activeAgentId,
+    isThinking: a.id === 'orchestrator' ? isStreaming : (a as any).isThinking,
+  }));
 
   const handleSend = useCallback(async () => {
     if (!inputValue.trim() || isStreaming) return;
@@ -179,7 +183,7 @@ function App() {
     setInputValue('');
     setPhasePct(null);
     try {
-      const response = await processAgentMessage(inputValue); addLog('ok', 'llm', `Agent: ${response.slice(0,80)}`);
+      const response = processDelegationMarkers(await processAgentMessage(inputValue)); addLog('ok', 'llm', `Agent: ${response.slice(0,80)}`);
       setPhase('online');
       setPhasePct(null);
     } catch (err) {
@@ -231,10 +235,7 @@ function App() {
 
       <div className={styles.workspace}>
         <Sidebar
-          agents={agents.map(a => ({
-            ...a,
-            isActive: a.id === activeAgentId,
-          }))}
+          agents={agentsWithState}
           sessions={sessions.map(s => ({ ...s, isActive: s.id === activeSessionId }))}
           onToggleRail={() => setDrawerCollapsed(p => !p)}
           onNewSession={handleNewSession}
