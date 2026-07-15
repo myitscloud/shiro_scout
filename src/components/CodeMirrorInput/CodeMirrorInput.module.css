@@ -1,0 +1,23 @@
+.editor {
+  border: 1px solid var(--border-glass, rgba(42,42,58,.5));
+  border-radius: var(--r-md, 8px);
+  background: var(--bg-glass, rgba(26,26,36,.85));
+  transition: border-color var(--ease-fast, 150ms cubic-bezier(.4,0,.2,1));
+  min-height: 44px;
+  max-height: 200px;
+  overflow: hidden;
+}
+
+.editor:hover {
+  border-color: var(--border-glass-light, rgba(58,58,78,.6));
+}
+
+.focused {
+  border-color: var(--accent-purple, #8B5CF6);
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.15);
+}
+
+.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

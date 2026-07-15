@@ -1,2 +1,13 @@
-# Ensure LF line endings for Docker artifacts (FILEOPS-031)
-docker/** text eol=lf
+# Normalize to LF for all text files (FILEOPS-020)
+* text=auto eol=lf
+
+# Ensure LF line endings for Docker artifacts
+src-tauri/docker/** text eol=lf
+
+# Binary files — declare explicitly
+src-tauri/docker/agent-bridge binary
+src-tauri/docker/build-detached.log.err binary
+src-tauri/icons/* binary
+*.png binary
+*.ico binary
+*.icns binary

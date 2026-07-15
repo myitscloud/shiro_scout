@@ -23,10 +23,6 @@ Thumbs.db
 npm-debug.log*
 pnpm-debug.log*
 **/.a0proj/memory/**
-# Rust build output
-src-tauri/target/
-
-nul
 
 # Windows reserved names
 nul
@@ -35,11 +31,7 @@ nul
 src-tauri/target_clippy/
 src-tauri/gen/schemas/
 docs/REF_DOCS/
-
-
 src-tauri/target_g3/
-
 
 # Bridge agent build artifacts
 src-tauri/docker/bridge/target/
-

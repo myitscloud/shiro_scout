@@ -62,14 +62,14 @@
 
 ## 5. Agent Runtime (Wave 4)
 
-| # | Feature | Priority | Wave | Status |
-|:-:|---------|:--------:|:----:|:------:|
-| 35 | Perslent PTY shell sessions | P1 | 4 | 🔲 |
-| 36 | Agent state machine (idle → thinking → tool → done) | P0 | 0 | 🟡 |
-| 37 | Tool execution bridge (Rust → Docker exec) | P0 | 4 | 🔲 |
-| 38 | MCP server discovery (ADR-006) | P1 | 4 | 🔲 |
-| 39 | Agent state persistence | P1 | 4 | 🔲 |
+| # | Feature | Priority | Wave | Status | Source |
+|:-:|---------|:--------:|:----:|:------:|--------|
+| 35 | Persistent PTY shell sessions | P1 | 4 | ✅ | `pty/mod.rs` — session create/execute/close/list, timeout, terminal output cleanup |
+| 36 | Agent state machine (idle → thinking → tool → done) | P0 | 0 | ✅ | `agent/state.rs` (transition tracking), `agent/context.rs` (state mutation), `agent/agent.rs` (orchestration loop) |
+| 37 | Tool execution bridge (Rust → Docker exec via bollard) | P0 | 4 | ✅ | `bridge_client.rs` — `ToolExecBridge` with HTTP bridge client, exec result parsing, health check |
+| 38 | MCP server discovery (ADR-006) | P1 | 4 | ✅ | `mcp/mod.rs` — port scanning, health probes, registry (register/get/remove/clear), IPC commands |
+| 39 | Agent state persistence across app restarts | P1 | 4 | ✅ | `agent/persistence.rs` — `persist_save_state`/`persist_load_state`/`persist_clear_state` IPC commands, JSON file storage |
 
 ---
 
-*Generated from: docs/USER-PERSONAS.md, docs/Arch_Design/Agent Zero Architecture and PRD.md, docs/Arch_Design/MERGE-PRD-ROUGH-DRAFT.md, codebase component scan, FEATURES.md*
+*Generated from: codebase component scan, FEATURES.md. Last updated: 2026-07-15 (Wave 4 status synced with code)*

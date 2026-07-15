@@ -1,2 +1,6 @@
+packages:
+  - "src/*"
+  - "src-tauri/*"
+
 allowBuilds:
   esbuild: true

@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn test_agent_persisted_state_deserialize_with_skip_field() {
-        let json = r#"{"context":{"config":{"name":"test","max_iterations":10,"prompts_path":"/tmp"},"provider":{"name":"deepseek","model":"deepseek-chat","api_key":null,"base_url":null,"max_tokens":4096,"temperature":0.7},"history":{"messages":[]},"state":"Booting","loop_data":{"iteration":0,"last_response":null,"offset":0},"session":{"session_id":"","workspace_path":"","is_active":false,"started_at":"","current_directory":""}}}"#;
+        let json = r#"{"context":{"config":{"name":"test","max_iterations":10,"prompts_path":"/tmp"},"provider":{"name":"deepseek","model":"deepseek-v4-flash","api_key":null,"base_url":null,"max_tokens":4096,"temperature":0.7},"history":{"messages":[]},"state":"Booting","loop_data":{"iteration":0,"last_response":null,"offset":0},"session":{"session_id":"","workspace_path":"","is_active":false,"started_at":"","current_directory":""}}}"#;
         let state: AgentPersistedState = serde_json::from_str(json).unwrap();
         assert!(!state.context.intervention_flag);
         assert_eq!(state.context.state, AgentState::Booting);

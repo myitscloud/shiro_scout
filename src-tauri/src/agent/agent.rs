@@ -15,7 +15,7 @@ use crate::bridge_client::ToolExecBridge;
 use crate::error::{AgentError, AgentResult};
 use crate::prompts::PromptStore;
 use crate::tools::ToolRegistry;
-use crate::llm::{LlmTokenPayload, StreamCompletionInput, StreamMessage};
+use crate::llm::LlmTokenPayload;
 use rig::client::CompletionClient;
 use rig::completion::Chat;
 use tauri::{AppHandle, Emitter};
@@ -180,12 +180,10 @@ impl Agent {
         self.llm_call().await
     }
 
-    /// Streaming thinking: calls the LLM provider via the streaming infrastructure
-    /// from llm/mod.rs, emitting `llm-token` events per chunk so the frontend
-    /// can display incremental tokens.
+    /// Streaming thinking: calls the LLM provider via rig's native streaming API
+    /// (deepseek::Client -> completion_model -> completion_request -> stream),
+    /// emitting `llm-token` events per chunk so the frontend displays incremental tokens.
     async fn think_with_streaming(&self, app_handle: &AppHandle) -> AgentResult<String> {
-        let provider_name = &self.context.provider.name;
-        let model = &self.context.provider.model;
         let api_key = match &self.context.provider.api_key {
             Some(k) if !k.is_empty() => k.clone(),
             _ => {
@@ -194,140 +192,71 @@ impl Agent {
                     .unwrap_or_default()
             }
         };
-        let base_url = self.context.provider.base_url.clone();
+        let model = &self.context.provider.model;
         let max_tokens = self.context.provider.max_tokens;
         let temperature = self.context.provider.temperature;
-
         let system_prompt = self.system_prompt.as_deref().unwrap_or("You are a helpful AI assistant.");
-        let messages: Vec<StreamMessage> = self.context.history.messages.iter().map(|m| {
-            StreamMessage {
-                role: match m.role.as_str() {
-                    "user" | "assistant" | "system" => m.role.clone(),
-                    _ => "system".to_string(),
-                },
-                content: m.content.clone(),
-                name: None,
-                tool_call_id: None,
-            }
-        }).collect();
 
-        let input = StreamCompletionInput {
-            provider: provider_name.clone(),
-            model: model.clone(),
-            api_key: if api_key.is_empty() { None } else { Some(api_key.to_string()) },
-            base_url,
-            system_prompt: Some(system_prompt.to_string()),
-            messages,
-            max_tokens,
-            temperature,
-            role: "assistant".to_string(),
-        };
-
-        // Re-use the streaming logic from llm/mod.rs by constructing
-        // a reqwest client, calling the provider, and parsing SSE events.
-        let base_url = input
-            .base_url
-            .clone()
-            .unwrap_or_else(|| crate::llm::default_base_url_for(&input.provider));
-        let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
-
-        let mut api_messages: Vec<serde_json::Value> = Vec::new();
-        if let Some(system) = &input.system_prompt {
-            api_messages.push(serde_json::json!({"role": "system", "content": system}));
-        }
-        for msg in &input.messages {
-            let mut m = serde_json::Map::new();
-            m.insert("role".to_string(), serde_json::Value::String(msg.role.clone()));
-            m.insert("content".to_string(), serde_json::Value::String(msg.content.clone()));
-            api_messages.push(serde_json::Value::Object(m));
+        // Build chat history from AgentZero history messages
+        let mut chat_history: Vec<rig::completion::Message> = Vec::new();
+        for m in &self.context.history.messages {
+            let role = match m.role.as_str() {
+                "user" | "assistant" | "system" => m.role.clone(),
+                _ => "system".to_string(),
+            };
+            let msg = match role.as_str() {
+                "user" => rig::completion::Message::user(&m.content),
+                "assistant" => rig::completion::Message::assistant(&m.content),
+                _ => rig::completion::Message::user(&m.content), // system mapped as user
+            };
+            chat_history.push(msg);
         }
 
-        let request_body = serde_json::json!({
-            "model": input.model,
-            "messages": api_messages,
-            "max_tokens": input.max_tokens,
-            "temperature": input.temperature,
-            "stream": true,
-        });
+        // Use Rig's native DeepSeek client with streaming
+        let client = rig::providers::deepseek::Client::new(&api_key)
+            .map_err(|e| AgentError::Critical(format!("Failed to create DeepSeek client: {}", e)))?;
 
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(300))
-            .build()
-            .map_err(|e| AgentError::Critical(format!("Failed to create HTTP client: {}", e)))?;
+        let completion_model = client.completion_model(model);
 
-        let mut req = client.post(&url);
-        if let Some(ref key) = input.api_key {
-            if !key.is_empty() && input.provider != "ollama" {
-                req = req.header("Authorization", format!("Bearer {}", key));
-            }
-        }
-        req = req.header("Content-Type", "application/json");
-        req = req.header("Accept", "text/event-stream");
-        req = req.json(&request_body);
+        // Use the CompletionModel trait method to create a streaming request builder.
+        // We pass an empty prompt; the actual conversation is in chat_history.
+        use rig::completion::CompletionModel as _;
+        let mut stream = completion_model
+            .completion_request("Continue the conversation.")
+            .preamble(system_prompt.to_string())
+            .messages(chat_history)
+            .temperature(temperature)
+            .max_tokens(max_tokens as u64)
+            .stream()
+            .await
+            .map_err(|e| AgentError::Critical(format!("LLM streaming request failed: {}", e)))?;
 
-        let response = req.send().await
-            .map_err(|e| AgentError::Critical(format!("LLM request failed: {}", e)))?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            let err_msg = serde_json::from_str::<serde_json::Value>(&body)
-                .ok()
-                .and_then(|v| v["error"]["message"].as_str().map(String::from))
-                .unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
-
-            let _ = app_handle.emit(
-                "llm-token",
-                LlmTokenPayload {
-                    role: "assistant".to_string(),
-                    token: String::new(),
-                    done: true,
-                },
-            );
-            return Err(AgentError::Critical(err_msg));
-        }
-
-        use futures::StreamExt;
-        let mut stream = response.bytes_stream();
-        let mut buffer = String::new();
         let mut full_text = String::new();
+        use futures::StreamExt;
+        use rig::streaming::StreamedAssistantContent;
 
-        while let Some(chunk_result) = stream.next().await {
-            let chunk = chunk_result.map_err(|e| AgentError::Critical(format!("Stream read error: {}", e)))?;
-            buffer.push_str(&String::from_utf8_lossy(&chunk));
-
-            while let Some(pos) = buffer.find('\n') {
-                let line_end = pos;
-                let line = buffer[..line_end].trim_end().to_string();
-                buffer.drain(..=line_end);
-
-                if let Some(data_str) = line.strip_prefix("data: ") {
-                    let trimmed = data_str.trim();
-                    if trimmed == "[DONE]" {
-                        break;
+        while let Some(item) = stream.next().await {
+            match item {
+                Ok(StreamedAssistantContent::Text(text)) => {
+                    if !text.text.is_empty() {
+                        full_text.push_str(&text.text);
+                        let _ = app_handle.emit(
+                            "llm-token",
+                            LlmTokenPayload {
+                                role: "assistant".to_string(),
+                                token: text.text.to_string(),
+                                done: false,
+                            },
+                        );
                     }
-
-                    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                        if let Some(choices) = parsed["choices"].as_array() {
-                            if let Some(choice) = choices.first() {
-                                if let Some(delta) = choice["delta"].as_object() {
-                                    if let Some(content) = delta["content"].as_str() {
-                                        if !content.is_empty() {
-                                            full_text.push_str(content);
-                                            let _ = app_handle.emit(
-                                                "llm-token",
-                                                LlmTokenPayload {
-                                                    role: "assistant".to_string(),
-                                                    token: content.to_string(),
-                                                    done: false,
-                                                },
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                }
+                Ok(StreamedAssistantContent::ToolCall { .. }) => {
+                    // Tool calls are handled post-stream by process_message;
+                    // for streaming we just pass them through silently
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("[agent] Stream error: {}", e);
                 }
             }
         }
@@ -353,39 +282,49 @@ impl Agent {
         let provider_name = &self.context.provider.name;
         let model = &self.context.provider.model;
         let api_key = self.context.provider.api_key.as_deref().unwrap_or("");
-        let base_url = self.context.provider.base_url.as_deref();
         let max_tokens = self.context.provider.max_tokens as u64;
         let temperature = self.context.provider.temperature;
 
         let system_prompt = self.system_prompt.as_deref().unwrap_or("You are a helpful AI assistant.");
         let messages = self.context.history.to_messages();
 
-        let (_client_url, client_api_key) = match provider_name.as_str() {
-            "deepseek" => (base_url.unwrap_or("https://api.deepseek.com/v1"), api_key),
-            "openai" => (base_url.unwrap_or("https://api.openai.com/v1"), api_key),
-            "groq" => (base_url.unwrap_or("https://api.groq.com/openai/v1"), api_key),
-            "together" => (base_url.unwrap_or("https://api.together.xyz/v1"), api_key),
-            "ollama" => (base_url.unwrap_or("http://localhost:11434/v1"), "ollama"),
-            "litellm" => (base_url.unwrap_or("http://localhost:4000/v1"), api_key),
-            _ => return Err(AgentError::Critical(format!("Unknown provider: {}", provider_name))),
-        };
-
-        let client = rig::providers::openai::Client::new(client_api_key)
-            .map_err(|e| AgentError::Critical(format!("Failed to create LLM client: {}", e)))?;
-        let agent = client
-            .agent(model)
-            .preamble(system_prompt)
-            .temperature(temperature)
-            .max_tokens(max_tokens)
-            .build();
-
-        let mut chat_history = Vec::new();
-        let response = agent
-            .chat(messages, &mut chat_history)
-            .await
-            .map_err(|e| AgentError::Critical(format!("LLM call failed: {}", e)))?;
-
-        Ok(response)
+        // Use rig::providers::deepseek::Client for DeepSeek (default provider)
+        // Fall back to rig::providers::openai::Client for OpenAI-compatible providers
+        match provider_name.as_str() {
+            "deepseek" => {
+                let client = rig::providers::deepseek::Client::new(api_key)
+                    .map_err(|e| AgentError::Critical(format!("Failed to create DeepSeek client: {}", e)))?;
+                let agent = client
+                    .agent(model)
+                    .preamble(system_prompt)
+                    .temperature(temperature)
+                    .max_tokens(max_tokens)
+                    .build();
+                let mut chat_history = Vec::new();
+                let response = agent
+                    .chat(messages, &mut chat_history)
+                    .await
+                    .map_err(|e| AgentError::Critical(format!("LLM call failed: {}", e)))?;
+                Ok(response)
+            }
+            "openai" | "groq" | "together" | "ollama" | "litellm" => {
+                let client = rig::providers::openai::Client::new(api_key)
+                    .map_err(|e| AgentError::Critical(format!("Failed to create LLM client: {}", e)))?;
+                let agent = client
+                    .agent(model)
+                    .preamble(system_prompt)
+                    .temperature(temperature)
+                    .max_tokens(max_tokens)
+                    .build();
+                let mut chat_history = Vec::new();
+                let response = agent
+                    .chat(messages, &mut chat_history)
+                    .await
+                    .map_err(|e| AgentError::Critical(format!("LLM call failed: {}", e)))?;
+                Ok(response)
+            }
+            _ => Err(AgentError::Critical(format!("Unknown provider: {}", provider_name))),
+        }
     }
 
     /// Parse LLM response into (tool_name, tool_args) or plain text.

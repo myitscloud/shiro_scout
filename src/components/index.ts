@@ -38,3 +38,6 @@ export type { SettingsProps } from './Settings/Settings';
 
 export { default as FirstRunWizard } from './Wizard/FirstRunWizard';
 export type { FirstRunWizardProps } from './Wizard/FirstRunWizard';
+
+export { default as CodeMirrorInput } from './CodeMirrorInput/CodeMirrorInput';
+export type { CodeMirrorInputProps } from './CodeMirrorInput/CodeMirrorInput';

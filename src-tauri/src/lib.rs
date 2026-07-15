@@ -4,7 +4,6 @@ pub mod agent;
 pub mod bridge_client;
 pub mod container;
 pub mod docker_client;
-pub mod env;
 pub mod error;
 pub mod llm;
 pub mod prompts;
@@ -87,11 +86,11 @@ async fn process_agent_message(
     }
 }
 
-//// --------------------------------------------------------------------------
-//// Agent Bridge IPC commands (Wave 3.3)
-//// Proxies to the Docker sandbox bridge on port 8080
-//// --------------------------------------------------------------------------
-//// --------------------------------------------------------------------------
+/// --------------------------------------------------------------------------
+/// Agent Bridge IPC commands (Wave 3.3)
+/// Proxies to the Docker sandbox bridge on port 8080
+/// --------------------------------------------------------------------------
+/// --------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AgentStatusPayload {
@@ -183,8 +182,6 @@ pub fn run() {
             settings::test_llm_connection,
             // LLM Health
             crate::llm::health_check::get_provider_health,
-            // LLM Streaming
-            crate::llm::stream_llm_completion,
             // Docker/Sandbox (Wave 2 + Wave 3)
             crate::docker_client::check_docker_daemon,
             crate::container::create_sandbox,

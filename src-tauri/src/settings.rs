@@ -15,6 +15,9 @@ pub struct AppSettings {
     pub reduce_motion: bool,
     pub provider: String,
     pub model: String,
+    /// API key is deserialized for loading but never serialized to disk (C2/C10).
+    /// Keys use Windows Credential Manager for persistent storage.
+    #[serde(skip_serializing)]
     pub api_key: String,
     #[serde(alias = "workspacePath")]
     pub workspace_path: String,
@@ -100,14 +103,14 @@ impl Default for DangerousOperationsConfig {
 
 impl DangerousOperationsConfig {
     /// Returns the risk level for a given operation name, or None if not classified.
-    pub fn risk_level(&self, operation: &str) -> Option<&str> {
-        if self.critical.contains(&operation.to_string()) {
+    pub fn risk_level(&self, operation: &str) -> Option<&'static str> {
+        if self.critical.iter().any(|s| s == operation) {
             Some("critical")
-        } else if self.high.contains(&operation.to_string()) {
+        } else if self.high.iter().any(|s| s == operation) {
             Some("high")
-        } else if self.medium.contains(&operation.to_string()) {
+        } else if self.medium.iter().any(|s| s == operation) {
             Some("medium")
-        } else if self.low.contains(&operation.to_string()) {
+        } else if self.low.iter().any(|s| s == operation) {
             Some("low")
         } else {
             None
@@ -178,6 +181,9 @@ pub struct LlmSettings {
 pub struct ProviderSetting {
     pub provider: String,
     pub model: String,
+    /// API key is loaded from Windows Credential Manager, not settings JSON.
+    /// Skip serializing None values to avoid persisting empty keys.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
 }
 

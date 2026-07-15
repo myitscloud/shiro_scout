@@ -113,7 +113,8 @@ mod tests {
     fn test_history_add_tool() {
         let mut h = History::new();
         h.add_tool("read_file", "contents");
-        assert_eq!(h.messages[0].role, "tool");
+        // add_tool stores with role "assistant" (not "tool") for DeepSeek API compatibility
+        assert_eq!(h.messages[0].role, "assistant");
         assert!(h.messages[0].content.contains("read_file"));
     }
 
@@ -121,7 +122,8 @@ mod tests {
     fn test_history_add_warning() {
         let mut h = History::new();
         h.add_warning("something went wrong");
-        assert_eq!(h.messages[0].role, "warning");
+        // add_warning stores with role "system" (not "warning") for DeepSeek API compatibility
+        assert_eq!(h.messages[0].role, "system");
     }
 
     #[test]
@@ -142,11 +144,12 @@ mod tests {
         h.add_tool("tool", "output");
         h.add_warning("warn");
         let s = h.summary();
+        // add_tool stores as "assistant" role; add_warning stores as "system" role
+        // So: 1 user, 2 assistants, 1 system = 4 total
         assert!(s.contains("4 messages"));
         assert!(s.contains("1 user"));
-        assert!(s.contains("1 assistant"));
-        assert!(s.contains("1 tool"));
-        assert!(s.contains("1 warning"));
+        assert!(s.contains("2 assistant"));
+        assert!(s.contains("1 system"));
     }
 
     #[test]

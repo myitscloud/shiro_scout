@@ -12,7 +12,7 @@
 | **Design Language** | Neo-Glass Terminus |
 | **Stack** | Tauri 2 / Rust / React 18 / TypeScript / Vite / PowerShell 7 |
 | **Target** | Windows 11 (x64, ARM64) |
-| **Dev Environment** | Agent Zero in Linux (Kali) Docker container — production targets Windows via cross-compilation |
+| **Dev Environment** | Windows 11 — Tauri 2 + React 18 + TypeScript + Vite + PowerShell 7 |
 | **Package manager** | pnpm (standardized — see DEC-004) |
 
 ## 2. Prime Directives
@@ -86,7 +86,7 @@ Rules are stable — **never renumber. Deprecate and append.**
 | **O12** | **WIP limit.** Max 2 subordinates active at once (hardware cap: 4 total agents). Default to sequential delegation; use concurrency only for fully independent items. |
 | **O13** | **No file collisions.** Two agents never hold write scope over the same directory concurrently. |
 | **O14** | **Briefs use the template** in KICKOFF_PROMPT §5 — role, verbatim item, exact file scope, acceptance criteria. A vague brief is a Reviewer NO. |
-| **O15** | Agent Zero's `parallel` tool is for independent READ/verify operations only (max 8 per call) — never concurrent writes to the same tree. |
+| **O15** | The `parallel` tool is for independent READ/verify operations only (max 8 per call) — never concurrent writes to the same tree. |
 | **O16** | STOP conditions (SESSION_PROTOCOL §5) override the loop. When fired: stop, report, ask. Never invent work to stay busy. |
 
 ## 8. Routing Table
@@ -111,7 +111,7 @@ Rules are stable — **never renumber. Deprecate and append.**
 
 **Windows Systems Architect.** Owns Rust, Tauri backend, Win32/COM/CIM via `windows-rs`, bollard, PowerShell layer. Verifies with `cargo check --target x86_64-pc-windows-msvc` in-container. Never edits React/CSS. Flags any `unsafe` to Security.
 
-**Frontend Engineer.** Owns React 18/TypeScript strict/Vite/CSS Modules + `design-tokens.css`. Follows Neo-Glass Terminus (AEGIS-DESIGN-GUIDE.md). Never edits Rust. IPC changes only in sync with the Architect (C3).
+**Frontend Engineer.** Owns React 18/TypeScript strict/Vite/CSS Modules + `design-tokens.css`. Follows Neo-Glass Terminus ([AEGIS-DESIGN-GUIDE.md](docs/Arch_Design/AEGIS-DESIGN-GUIDE.md)). Never edits Rust. IPC changes only in sync with the Architect (C3).
 
 **Security Engineer.** Blocking authority (Prime Directive 1). Owns threat model (STRIDE), capabilities audit, dependency approval (C12), secret scanning, sandbox policy (`network_mode: none`, cap_drop ALL). Reviews every §8 trigger.
 
@@ -137,7 +137,7 @@ Rules are stable — **never renumber. Deprecate and append.**
 
 ## 11. Session Protocol Pointer
 
-Sessions run per `SESSION_PROTOCOL.md`: bootstrap → Batch Loop (§4) → STOP/ASK (§5). Agent Zero recalled memories are suggestions; `MEMORY.md` and this charter are the authority when they disagree.
+Sessions run per `SESSION_PROTOCOL.md`: bootstrap → Batch Loop (§4) → STOP/ASK (§5). `MEMORY.md` and this charter are the authority; trust them over any recalled context.
 
 ---
 

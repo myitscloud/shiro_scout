@@ -63,18 +63,16 @@ fn generate_nonce() -> String {
         .as_nanos();
     let input = format!("{}-{}", uuid, now);
     // Use a simple hash for the nonce — avoids adding a crypto dependency
-    let hash = blake3_hash(&input);
+    let hash = simple_hash(&input);
     hash.to_string()
 }
 
 /// Simple hash function for nonce generation.
 /// Uses a basic digest approach with no external dependencies beyond std.
-fn blake3_hash(input: &str) -> String {
-    // Use SHA-256 via the windows crate's built-in hashing if available,
-    // but since we target Windows with windows-rs, fall back to hex encoding
-    // of a simple digest computed from the input bytes.
+fn simple_hash(input: &str) -> String {
     let bytes = input.as_bytes();
     // A simple but sufficient hash for nonce purposes (not cryptographic auth)
+    // Does NOT use Blake3 despite the original function name — uses std DefaultHasher.
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     let mut hasher = DefaultHasher::new();

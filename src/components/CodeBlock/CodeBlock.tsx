@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useShikiHighlighter } from '../../hooks/useShikiHighlighter';
 import styles from './CodeBlock.module.css';
 
 interface CodeBlockProps {
@@ -7,52 +8,6 @@ interface CodeBlockProps {
   filename?: string;
   showRun?: boolean;
   onRun?: () => void;
-}
-
-function tokenize(code: string, lang?: string): React.ReactNode[] {
-  const tokens: React.ReactNode[] = [];
-  const lines = code.split('\n');
-  lines.forEach((line, li) => {
-    if (li > 0) tokens.push('\n');
-    if (!lang || lang === 'text') {
-      tokens.push(line);
-      return;
-    }
-    let remaining = line;
-    const parts: React.ReactNode[] = [];
-    const commentMatch = remaining.match(/^(\/\/.*)/);
-    if (commentMatch) {
-      parts.push(<span className={styles['tk-cm']} key={`${li}-c`}>{commentMatch[0]}</span>);
-      remaining = remaining.slice(commentMatch[0].length);
-    }
-    const stringRegex = /^("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/;
-    const strMatch = remaining.match(stringRegex);
-    if (strMatch) {
-      parts.push(<span className={styles['tk-str']} key={`${li}-s`}>{strMatch[0]}</span>);
-      remaining = remaining.slice(strMatch[0].length);
-    }
-    const keywords = new Set([
-      'fn','let','mut','const','if','else','for','while','return',
-      'pub','use','mod','struct','enum','impl','trait','async','await',
-      'import','export','default','from','class','function','var',
-      'type','interface','extends','new','this','try','catch','throw','match',
-    ]);
-    const wordRegex = /([\w$]+|[^\w$]+)/g;
-    let match;
-    while ((match = wordRegex.exec(remaining)) !== null) {
-      const word = match[1];
-      if (keywords.has(word)) {
-        parts.push(<span className={styles['tk-kw']} key={`${li}-${match.index}`}>{word}</span>);
-      } else if (/^\d+(\.\d+)?$/.test(word)) {
-        parts.push(<span className={styles['tk-num']} key={`${li}-${match.index}`}>{word}</span>);
-      } else {
-        parts.push(word);
-      }
-    }
-    if (parts.length === 0) tokens.push(line);
-    else tokens.push(...parts);
-  });
-  return tokens;
 }
 
 const CodeBlock: React.FC<CodeBlockProps> = ({
@@ -64,8 +19,25 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [running, setRunning] = useState(false);
+  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
+  const { ready, highlight } = useShikiHighlighter();
+  const prevCodeRef = useRef(code);
+  const prevLangRef = useRef(language);
+
   const lineCount = code.split('\n').length;
-  const tokens = React.useMemo(() => tokenize(code, language), [code, language]);
+
+  // Highlight code with shiki when highlighter is ready or code changes
+  useEffect(() => {
+    if (!ready) return;
+    if (prevCodeRef.current === code && prevLangRef.current === language && highlightedHtml) return;
+    prevCodeRef.current = code;
+    prevLangRef.current = language;
+
+    const lang = language || 'text';
+    highlight(code, lang).then((result) => {
+      setHighlightedHtml(result.html);
+    });
+  }, [code, language, ready, highlight, highlightedHtml]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -87,6 +59,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
     <div className={styles.codeblock}>
       <div className={styles['cb-head']}>
         📄 <span className={styles.fname}>{filename || 'code'}</span>
+        {language && <span className={styles.lang}>{language}</span>}
         <button className="btn sm ghost copy-btn" title="Copy code" onClick={handleCopy}>
           {copied ? '✓ Copied' : '⧉ Copy'}
         </button>
@@ -96,8 +69,17 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
           </button>
         )}
       </div>
-      <pre><code>{tokens}</code></pre>
-      <div className={styles['cb-foot']}>Lines 1–{lineCount} · {language || 'text'} · +1 −1</div>
+      <div className={styles['cb-body']}>
+        {highlightedHtml ? (
+          <div
+            className={styles.highlighted}
+            dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+          />
+        ) : (
+          <pre><code>{code}</code></pre>
+        )}
+      </div>
+      <div className={styles['cb-foot']}>Lines 1–{lineCount} · {language || 'text'}</div>
     </div>
   );
 };

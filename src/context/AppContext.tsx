@@ -296,7 +296,7 @@ export function AppProvider({ children }: AppProviderProps) {
   });
 
   const [agents, setAgents] = useState<AgentInfo[]>(DEFAULT_AGENTS);
-  const [activeAgentId, setActiveAgentId] = useState('alpha');
+  const [activeAgentId, setActiveAgentId] = useState('orchestrator');
 
   const [sessions, setSessions] = useState<SessionInfo[]>(DEFAULT_SESSIONS);
   const [activeSessionId, setActiveSessionId] = useState('s1');

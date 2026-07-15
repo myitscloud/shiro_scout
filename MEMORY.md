@@ -1,8 +1,8 @@
 # Memory — ShiroScout Project State & Reference
 
 > **Purpose:** Single source of truth for project state, environment, version locks, paths, constraints.
-> **Environment:** Agent Zero in Linux (Kali) Docker container · code targets Windows 11
-> **Last updated:** 2026-07-10 · **Line endings:** LF (this file was CRLF before — fixed per FILEOPS-020)
+> **Environment:** Windows 11 — Tauri 2 + React 18 + TypeScript + Vite + PowerShell 7
+> **Last updated:** 2026-07-15 · **Line endings:** LF (FILEOPS-020)
 
 ---
 
@@ -10,23 +10,21 @@
 
 | Field | Value |
 |-------|-------|
-| **Current focus** | Core infrastructure validated — chat + mount + IPC pipeline working end-to-end. Ready for next wave work items. |
-| **Progress** | Waves 0, 2, 3, 5 ✅ · Wave 1 🟡 (closeout items) · Wave 6 🟡 (only 6.7 open + drift re-verify 6.V) · Waves 4, 7, 8 🔲 · **Infrastructure validation** |
-| **Last action** | 2026-07-14 — Fixed `tool_call_id` deserialization error (serde_json::Map), added keychain fallback, role normalization, automated backup via robocopy to X: drive, git push to GitHub |
-| **Next task** | Proceed to Wave 1 batch 1 items now that infrastructure is validated |
-| **Active branch** | main — git initialized, committed (36c185b), remote: `https://github.com/myitscloud/shiro_scout.git` |
-| **Sprint goal** | Green baseline gates, LF everywhere, git initialized, streaming shipped |
+| **Current focus** | Waves 0–7, 9 complete. Wave 8: 8.1 build verified (23.4 MB binary, 8.6 MB MSI), 8.3 updater configured. Remaining: code signing, Ring 2 release run. |
+| **Progress** | Waves 0, 1, 2, 3, 4, 5, 6, 7, 9 ✅ · Wave 8 🟡 (8.1 packaging done, 8.3 updater partial, 8.2/8.4 open) |
+| **Last action** | 2026-07-15 — Full session: Rig/CRLF audit, 6.V drift verify, Wave 4 doc sync, Wave 7.3 threat model refresh, Wave 7.4 gitleaks CI, Wave 7.5 capabilities audit, Wave 8 release workflow + build test. ARM64 dropped. All gates verified (104/104 tests). |
+| **Next task** | Wave 8.2: Acquire code signing certificate, set GitHub secrets. 8.4: Ring 2 release run on Windows hardware. |
+| **Active branch** | main — pushed to `origin/main` |
+| **Sprint goal** | Wave 8 complete: code signing + Ring 2 release run |
 
 ## §2 Environment
 
 | Property | Value |
 |----------|-------|
-| OS / Host | Kali Linux (Debian-based) in Docker · user root |
-| Agent Zero root | `/a0/` |
-| Project root | `/a0/usr/projects/shiro_scout/` |
-| Scratch workdir | `/a0/usr/workdir/` |
-
-**Agent Zero tools:** `code_execution_tool` (terminal/Python/Node, session-persistent) · `text_editor` (read/write/patch) · `document_query` · `search_engine` · `call_subordinate` (Ring 2 delegation) · `memory_load/save/forget/delete` (durable facts only) · `browser` · `vision_load` · `office_artifact` · `parallel` (independent tool calls, max 8 — reads only per O15).
+| OS / Host | Windows 11 (x64, ARM64) |
+| Project root | `c:/shiro_scout/` |
+| Sandbox container | Debian Bookworm Slim (`debian:bookworm-slim`) |
+| Package manager | pnpm (standardized — see DEC-004) |
 
 ## §3 Version Locks
 
@@ -43,18 +41,23 @@
 ## §4 Key Paths
 
 ```
-/a0/usr/projects/shiro_scout/
-├── KICKOFF_PROMPT.md · LOOP_PROMPT.md · SESSION_PROTOCOL.md
-├── MEMORY.md (this file) · DECISIONS.md · THREAT_MODEL.md
+c:/shiro_scout/
+├── AGENTS.md · BUILD_PLAN.md · DECISIONS.md · DONE.md · FEATURES.md
+├── FILEOPS.md · KICKOFF_PROMPT.md · LOOP_PROMPT.md · MEMORY.md
+├── SESSION_PROTOCOL.md
 ├── docs/
-│   ├── AGENTS.md (charter + role cards + routing)
-│   ├── BUILD_PLAN.md · DONE.md · FILEOPS.md · GLOSSARY.md · FEATURES.md
+│   ├── adr/ (ADR-*.md)
+│   ├── Arch_Design/ (AEGIS-DESIGN-GUIDE.md)
 │   ├── agent-profiles/ (9 full role profiles)
-│   ├── adr/ (⚠ duplicate numbering — housekeeping item H.1)
 │   ├── mini-specs/ (MSPEC-*.md)
-│   └── Arch_Design/ (AEGIS-DESIGN-GUIDE.md, PRDs)
-├── src/ (React: components/, styles/design-tokens.css, App.tsx, main.tsx)
-└── src-tauri/ (Cargo.toml, tauri.conf.json, src/{main,lib,sandbox}.rs)
+│   ├── threats/ (THREAT_MODEL.md)
+│   └── xterm-mspec/ (MSPEC-T1, AGENT-HANDOFF-xterm)
+├── scripts/ (auto-backup.ps1, build-release.ps1)
+├── src/ (React: components/, styles/, App.tsx, main.tsx, hooks/)
+├── src-tauri/ (Cargo.toml, tauri.conf.json, capabilities/)
+│   ├── src/ (main.rs, lib.rs, bridge_client, container, docker_client, …)
+│   │   ├── agent/ · llm/ · mcp/ · prompts/ · pty/ · sandbox/ · tools/
+│   └── docker/ (Dockerfile.sandbox, entrypoint.sh, bridge/)
 ```
 
 ## §5 Architecture Summary
@@ -68,8 +71,7 @@ Tauri 2 desktop app → React 18 + TS (Vite, CSS Modules + design-tokens.css) �
 | # | Constraint |
 |---|------------|
 | 1 | Code targets **Windows 11 only** — never make it cross-platform to silence errors |
-| 2 | This container is Linux — cannot execute Windows-native code (Ring 1 = static checks + msvc target) |
-| 3 | No host filesystem access from the container |
+| 2 | Ring 1 static checks use `cargo check --target x86_64-pc-windows-msvc`; full runtime tests require Ring 2 (Windows) |
 | 4 | Rust uses the `windows` crate for Win32; compile-check against `x86_64-pc-windows-msvc` |
 | 5 | Tauri 2.x, not 1.x (ADR-004) |
 | 6 | CSS Modules + custom properties — no Tailwind, no CSS-in-JS (ADR-004) |
@@ -81,20 +83,22 @@ Tauri 2 desktop app → React 18 + TS (Vite, CSS Modules + design-tokens.css) �
 | 12 | TODO updated on every item completion |
 | 13 | DONE.md gates before any ✅ |
 | 14 | Two-strike rule — escalate after 2 failures |
-| 15 | Agent Zero memory tools = durable facts only; MEMORY.md + charter win conflicts |
+| 15 | MEMORY.md and AGENTS.md (charter) are authoritative; trust them over any recalled context |
 | **16** | **WIP limit: max 2 concurrent subordinates** (hardware caps ~4 agents total) — O12 |
 
-## §7 File Editing Quick Reference (Linux-first — full contract in docs/FILEOPS.md)
+## §7 File Editing Quick Reference (Windows-native — full contract in `FILEOPS.md`)
 
-```bash
-text_editor action:read  path:/a0/usr/projects/shiro_scout/FILE.md line_from:1 line_to:50
-text_editor action:write path:/a0/usr/projects/shiro_scout/FILE.md content:"..."
-text_editor action:patch path:FILE.md old_text:"exact unique text" new_text:"replacement"
-grep -rn "pattern" docs/            # search
-find . -name "*.md" -type f         # locate
-sed 's/old/new/g' file.md           # REHEARSE without -i first (FILEOPS-044)
-sed -i 's/old/new/g' file.md        # then apply
-wc -l file.md && grep -n "sentinel" file.md   # verify after every write (FILEOPS-043)
+Use the `apply_diff` tool for precise edits. For command-line operations:
+```powershell
+# Search
+Select-String -Path "docs/*.md" -Pattern "pattern"
+
+# Locate files
+Get-ChildItem -Recurse -Filter "*.md"
+
+# Verify after write
+Get-Content FILE.md | Measure-Object -Line
+Select-String -Path FILE.md -Pattern "sentinel"
 ```
 
 ## §8 Recent History
@@ -105,11 +109,14 @@ wc -l file.md && grep -n "sentinel" file.md   # verify after every write (FILEOP
 | 2026-07-08 | SESSION_PROTOCOL, KICKOFF_PROMPT, MEMORY, path-controls, state-preservation docs |
 | 2026-07-09 | Wave 6 LLM types fixed — Rust 0 errors; TS fix in progress |
 | 2026-07-10 | **Governance v2:** BUILD_PLAN rebuilt after corruption; Batch Loop + STOP/ASK; Linux-first FILEOPS; O10–O16; pnpm standardized; DONE.md dual-ring |
-| 2026-07-14 | **Infrastructure fixed + validated:** `tool_call_id` deserialization error resolved (serde_json::Map preserves fields), keychain fallback added to agent loop, role normalization filters non-standard roles, automated backup via robocopy to X: drive, git push complete — chat agent responds and executes commands correctly |
+| 2026-07-14 | **Infrastructure fixed + validated:** `tool_call_id` deserialization error resolved, keychain fallback, role normalization, automated backup, git push |
+| 2026-07-15 | **Full verification audit (Phases A–F):** All files verified, cross-references checked, build gates run (G0–G5 pass with 3 fixes). TRUE status synced to BUILD_PLAN.md, MEMORY.md, SESSION_PROTOCOL.md. Rig 0.39.0 integration confirmed. 104/104 tests passing. |
+| 2026-07-15 (late) | **Rig/CRLF audit session:** Verified all Wave 9 items complete (Rig migration, streaming, dead code, gitattributes, CRLF, pnpm audit, CodeMirrorInput+Shiki). Fixed stray `O` char in `lib.rs:1` causing compile error. Fixed unused var warning in `keychain.rs:307`. Removed stale `.a0proj/` and dead `env/mod.rs` from git index. Renormalized git line endings. Updated BUILD_PLAN.md and MEMORY.md to reflect true status. **Gates:** G0–G5 all pass (tsc, pnpm build, cargo check, clippy, 104/104 tests). |
+| 2026-07-15 (end) | **Full sprint completion:** Wave 6.V drift verify completed (gates pass). Wave 4 doc sync (FEATURES.md, README.md updated). Wave 7.3 threat model refresh (confirmed accurate). Wave 7.4 gitleaks CI verified (already wired). Wave 7.5 capabilities audit (minimal and correct). Wave 8 release workflow created (`.github/workflows/release.yml`). Tauri build verified: 23.4 MB binary, 8.6 MB MSI. `_notes` config error fixed. ARM64 dropped. BUILD_PLAN.md fully updated. All remaining open items: Wave 8.2 (code signing) + Wave 8.4 (Ring 2 run). **End Task Ritual** performed — MEMORY synced, stray processes killed, git commit + push to `origin/main`. |
 
 ## §9 End Task Ritual (per batch close)
 
-Sync §1 + §8 → update TODO tables → batch report → kill stray processes → (once 1.D lands) commit + push.
+Sync §1 + §8 → update TODO tables → batch report → kill stray processes → commit + push.
 
 ---
 

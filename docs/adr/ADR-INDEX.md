@@ -20,7 +20,7 @@
 
 ## Cross-References
 
-- ADR-001 documents reference strategy for Agent Zero material
+- ADR-001 documents reference strategy for project documentation
 - ADR-002 and ADR-007 together define the Docker sandbox architecture and container model
 - ADR-003 and ADR-008 define the bridge between container and Tauri host
 - ADR-004 and ADR-009 define the CSS architecture and visual design language

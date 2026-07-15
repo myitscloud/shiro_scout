@@ -264,32 +264,8 @@ export function listenForHITLRequest(
 // LLM Streaming — Send a message to the agent backend
 // ============================================================
 
-export interface ChatTurn {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
-
-/** Send conversation history to the LLM; tokens arrive via `llm-token` events. */
-export async function sendMessage(
-  history: ChatTurn[],
-  provider: string,
-  model: string,
-  apiKey: string,
-  systemPrompt?: string,
-): Promise<void> {
-  return invoke<void>('stream_llm_completion', {
-    input: {
-      provider,
-      model,
-      api_key: apiKey || undefined,
-      system_prompt: systemPrompt || undefined,
-      messages: history,
-      max_tokens: 8192,
-      temperature: 0.7,
-      role: 'chat',
-    },
-  });
-}
+// All LLM calls are routed through the agent state machine (process_agent_message)
+// which uses rig::providers internally. Tokens arrive via `llm-token` events.
 
 /** Send a message to the ShiroScout agent state machine. Runs tools (terminal, file, etc.) in the sandbox and returns the final response text. */
 export async function processAgentMessage(message: string): Promise<string> {

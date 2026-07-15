@@ -2,7 +2,7 @@
 
 **Document:** `THREAT_MODEL.md`
 **Owner:** Security Engineer (blocking authority)
-**Last Updated:** 2026-07-08
+**Last Updated:** 2026-07-15
 **Framework:** STRIDE (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege)
 
 ---
@@ -557,3 +557,4 @@ The Security Engineer must perform a full review of `THREAT_MODEL.md` under the 
 | 2026-07-08 | Initial creation — comprehensive STRIDE threat model across 4 boundaries with 6 attack scenarios, 33 security controls, and 14 prioritized recommendations | Security Engineer |
 | 2026-07-10 | Wave 4 code verification refresh: SC-41/SC-52 verified against shipped code (10 ❌ Missing, 2 🟡 Partial); risk reassessed; §5 controls updated with evidence; §6 expanded with R25-R35 | Security Engineer |
 | 2026-07-10 | **V2 Wave 4 deep code review** — 8 new critical/medium findings from source code audit; Settings plaintext API key exposure; MCP port scanning amplification; tool exec host fallback; PTY background task leak; HITL nonce weakness; state machine adjacency missing; capabilities scoping gap; update §3.5 STRIDE threats, §4 new scenarios 11-12, §5 new SC-53/SC-54, §6 new R36-R43, §8 new triggers | Security Engineer |
+| 2026-07-15 | **Wave 7.3 refresh** — Code re-verification of all ❌ and 🟡 controls confirms no changes since 2026-07-10. SC-41/SC-52 remain 10 ❌, 2 🟡. Fixes applied this session (stray `O` char fix, unused var fix, `.a0proj` cleanup, `env/mod.rs` removal) are housekeeping only and do not impact any security control. `lib.rs` line endings normalized. Wave 6 streaming verified (not a security control change). All existing R36-R43 remediation priorities remain valid. See `MEMORY.md` for full session log. | Security Engineer |

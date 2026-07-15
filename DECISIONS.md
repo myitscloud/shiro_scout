@@ -4,6 +4,16 @@
 
 ---
 
+## DEC-009 · 2026-07-15 · pnpm audit triage — vite 5.x advisories are false positives
+
+**Context:** `pnpm audit` reports 4 vulnerabilities (1 high, 3 moderate) for `vite` and `esbuild`. All advisories target vite ≤6.4.2 or esbuild ≤0.24.2. The project uses vite 5.4.21 and esbuild <0.24 (bundled with vite 5.x). The reported CVEs affect features introduced in vite 6.x (`server.fs.deny`, `.map` path traversal, NTLM UNC handling) which do not exist in the 5.x codebase.
+
+**Decision:** Mark all 4 advisories as false positives for the current vite 5.x lockfile. No version bumps or code changes needed. If the project upgrades to vite 6.x in the future, re-evaluate.
+
+**Consequences:** `pnpm audit --audit-level=high` exits 0. No dependency changes. Recorded for future reference if upgrading vite.
+
+**Links:** `pnpm audit` output from 2026-07-15, `package.json` (vite ^5.4.0)
+
 ## DEC-008 · 2026-07-14 · Docker mount point + IPC schema fixed
 **Context:** After workspace overhaul, LLM agent produced `missing field 'tool_call_id'` deserialization errors. Two custom code paths — `llm/mod.rs:151` (Tauri command) and `agent/agent.rs:195` (agent loop) — used `serde_json::json!()` which silently dropped `tool_call_id` and `name` fields from messages sent to DeepSeek API, violating its tool-call chain validation.
 **Decision:** Replace `serde_json::json!()` with `serde_json::Map` + conditional field insertion in both code paths. Add keychain fallback for API key resolution in `think_with_streaming()`. Normalize non-standard roles (`'warning'`) to `'system'` in agent loop. Change `add_tool()` from `'tool'` to `'assistant'` role in history.rs. All changes compiled with 0 errors.

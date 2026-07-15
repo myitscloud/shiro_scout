@@ -10,6 +10,7 @@ import {
   useToast,
   SettingsView,
   FirstRunWizard,
+  CodeMirrorInput,
 } from './components';
 import ConfirmationDialog from './components/ConfirmationDialog/ConfirmationDialog';
 import { useAppContext } from './context/AppContext';
@@ -296,14 +297,12 @@ function App() {
 
           <div className="chat-input">
             <div className="ci-box">
-              <textarea
-                id="chatInput"
-                rows={1}
-                placeholder={`Message ${currentAgent.name}...`}
-                aria-label="Message the agent"
+              <CodeMirrorInput
                 value={inputValue}
-                onChange={e => setInputValue(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); handleSend(); }}}
+                onChange={setInputValue}
+                onCtrlEnter={handleSend}
+                placeholder={`Message ${currentAgent.name}...`}
+                disabled={isStreaming}
               />
               <div className="ci-row">
                 <button className="btn icon ghost sm" title="Attach file" aria-label="Attach file" onClick={() => addToast({message: 'File attachment coming soon', type: 'info'})}>📎</button>

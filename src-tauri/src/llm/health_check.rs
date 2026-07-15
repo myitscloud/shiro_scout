@@ -5,6 +5,8 @@ use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::sync::RwLock;
 
+use crate::llm::default_base_url_for;
+
 // --------------------------------------------------------------------------
 // Types for IPC (C10: sanitized strings only)
 // --------------------------------------------------------------------------
@@ -391,19 +393,6 @@ impl HealthCheck {
     }
 }
 
-/// Default base URL for known providers.
-pub fn default_base_url_for(provider: &str) -> String {
-    match provider {
-        "deepseek" => "https://api.deepseek.com/v1".to_string(),
-        "openai" => "https://api.openai.com/v1".to_string(),
-        "groq" => "https://api.groq.com/openai/v1".to_string(),
-        "together" => "https://api.together.xyz/v1".to_string(),
-        "ollama" => "http://localhost:11434/v1".to_string(),
-        "litellm" => "http://localhost:4000/v1".to_string(),
-        _ => format!("https://api.{}.com/v1", provider),
-    }
-}
-
 // --------------------------------------------------------------------------
 // Tauri commands
 // --------------------------------------------------------------------------
@@ -651,7 +640,7 @@ mod tests {
     fn test_default_base_urls() {
         assert_eq!(
             default_base_url_for("deepseek"),
-            "https://api.deepseek.com/v1"
+            "https://api.deepseek.com"
         );
         assert_eq!(
             default_base_url_for("openai"),

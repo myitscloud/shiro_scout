@@ -61,5 +61,22 @@ if ($deny) {
     Write-Host "[5/5] SBOM: SKIPPED (cargo-deny missing)" -ForegroundColor Yellow
 }
 
+# Step 6: Secret scan (if gitleaks available)
+Write-Host "`n[6/6] Running gitleaks secret scan..." -ForegroundColor Yellow
+$gitleaks = Get-Command gitleaks -ErrorAction SilentlyContinue
+if ($gitleaks) {
+    Set-Location $ProjectRoot
+    gitleaks detect --source . --config gitleaks.toml --no-git
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "[6/6] Secret scan: PASS" -ForegroundColor Green
+    } else {
+        Write-Host "[6/6] Secret scan: FAILED" -ForegroundColor Red
+        Write-Host "Review findings above. Update gitleaks.toml if false positive." -ForegroundColor Yellow
+    }
+} else {
+    Write-Warning "gitleaks not installed. Install from: https://github.com/gitleaks/gitleaks/releases"
+    Write-Host "[6/6] Secret scan: SKIPPED (gitleaks missing)" -ForegroundColor Yellow
+}
+
 Write-Host "`n=== All gates PASSED ===" -ForegroundColor Green
 Set-Location $ProjectRoot

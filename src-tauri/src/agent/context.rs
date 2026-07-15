@@ -28,7 +28,7 @@ impl Default for ProviderConfig {
     fn default() -> Self {
         Self {
             name: "deepseek".into(),
-            model: "deepseek-chat".into(),
+            model: "deepseek-v4-flash".into(),
             api_key: None,
             base_url: None,
             max_tokens: 4096,

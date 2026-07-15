@@ -1,7 +1,7 @@
 # Session Protocol
 
 > **Purpose:** How AI sessions operate on ShiroScout — rings, lifecycle, TODO bookkeeping, the Batch Loop that keeps agents working, and the STOP/ASK protocol that tells them when to halt and talk to the boss.
-> **Environment:** Agent Zero in Linux Docker container · code targets Windows 11
+> **Environment:** Windows 11 native · Tauri 2 + React 18 + TypeScript + Vite
 
 ---
 
@@ -80,36 +80,36 @@ A STOP ends the loop turn. Report using the matching template, then **wait for t
 | **STOP-6 Scope conflict** | Correct fix requires touching files outside the plan/brief | "Plan says touch <X>; reality requires <Y> because <reason>. Approve scope change or re-spec?" |
 | **STOP-7 Resource limit** | Work needs > 2 concurrent subordinates, or container resources exhausted | State the constraint and a sequentialized plan; ask before proceeding. |
 
-## §6 Current TODO (synced 2026-07-10 — reconciled against FEATURES.md)
+## §6 Current TODO (synced 2026-07-15 — full verification audit completed)
 
-> ⚠ **Drift notice:** the 2026-07-09 version of this table said Wave 6.4/6.5/6.8 were not started, while FEATURES.md (2026-07-10) marks them ✅. FEATURES is newer and wins, **but** those items must show a DONE.md completion report from this or a prior session before anyone builds on them. First batch below re-verifies.
+> ⚠ **Previous drift resolved.** Full audit (Phases A–F) confirmed true project status on 2026-07-15. BUILD_PLAN.md is now authoritative.
 
-### Wave 1 — Scaffold & Toolchain closeout (🟡)
+### Wave 1 — Scaffold & Toolchain closeout (🟡 — 1.B remains)
 
-| Item | Task | Owning Agent | Dependencies | Status |
-|------|------|--------------|--------------|--------|
-| 1.A | Re-run full gate sequence on current tree; record baseline report | QA / Test Engineer | — | ✅ (PARTIAL: 3 blockers) |
-| 1.B | `.gitattributes` LF enforcement + convert stray CRLF files (MEMORY.md was CRLF) | Windows Systems Architect | — | ✅ |
-| 1.C | Finish `cargo-deny` license/advisory config; wire into gate G4.5 | Security Engineer | 1.A | ✅ |
-| 1.D | `git init` + initial commit + push (End Task Ritual from MEMORY §9) | Release / DevOps | 1.B | ⏸️ remote origin has history — needs force-push decision |
-| 1.E | Tauri shell IPC completion check — every stub in `lib.rs` implemented or `// BLOCKED: BLK-n` | Windows Systems Architect | 1.A | ⏸️ blocked on 1.A baseline resolution |
+| Item | Task | Owning Agent | Dependencies | Status | Notes |
+|------|------|--------------|--------------|--------|-------|
+| 1.A | Re-run full gate sequence on current tree; record baseline report | QA / Test Engineer | — | ✅ | Verified: G0–G5 all pass (2 minors fixed) |
+| 1.B | `.gitattributes` LF enforcement + convert stray CRLF files | Windows Systems Architect | — | 🟡 | `.gitattributes` missing `* text=auto eol=lf`; 4 files CRLF |
+| 1.C | Finish `cargo-deny` license/advisory config; wire into gate G4.5 | Security Engineer | — | ✅ | Passes cleanly |
+| 1.D | `git init` + initial commit + push | Release / DevOps | — | ✅ | 6 commits, pushed to GitHub, up to date |
+| 1.E | Tauri shell IPC completion check — every stub in `lib.rs` implemented or `// BLOCKED: BLK-n` | Windows Systems Architect | — | ✅ | All commands registered, no stubs |
 
-### Wave 6 — LLM Integration (🟡, nearly done)
-
-| Item | Task | Owning Agent | Dependencies | Status |
-|------|------|--------------|--------------|--------|
-| 6.7 | Streaming response handling (Rust emit → IPC events → StreamingText UI) | Frontend Engineer (Architect consulted, C3) | 1.A | 🔄 |
-| 6.V | Gate-verify 6.4 / 6.5 / 6.8 with completion reports (drift check) | QA / Test Engineer | 1.A | 🔲 |
-
-### Wave 4 — AgentKit Runtime (next major wave)
+### Wave 6 — LLM Integration (🟡)
 
 | Item | Task | Owning Agent | Dependencies | Status |
 |------|------|--------------|--------------|--------|
-| 4.1 | Agent state machine completion (idle→thinking→tool→done) | Windows Systems Architect | 6.7 | 🔲 |
-| 4.2 | Tool execution bridge (Rust → Docker exec) | Windows Systems Architect | 4.1 | 🔲 |
-| 4.3 | Persistent PTY shell sessions | Windows Systems Architect | 4.2 | 🔲 |
-| 4.4 | Agent state persistence | Windows Systems Architect | 4.1 | 🔲 |
-| 4.5 | MCP server discovery (per ADR-006) | Windows Systems Architect | 4.2 | 🔲 |
+| 6.7 | Streaming response handling (Rust emit → IPC events → StreamingText UI) | Frontend Engineer (Architect consulted, C3) | — | 🔄 |
+| 6.V | Gate-verify 6.4 / 6.5 / 6.8 with completion reports (drift check) | QA / Test Engineer | — | 🔲 |
+
+### Wave 4 — AgentKit Runtime (🟡 — code exists, docs need sync)
+
+| Item | Task | Owning Agent | Dependencies | Status |
+|------|------|--------------|--------------|--------|
+| 4.1 | Agent state machine completion (idle→thinking→tool→done) | Windows Systems Architect | — | ✅ |
+| 4.2 | Tool execution bridge (Rust → Docker exec) | Windows Systems Architect | — | ✅ |
+| 4.3 | Persistent PTY shell sessions | Windows Systems Architect | — | ✅ |
+| 4.4 | Agent state persistence | Windows Systems Architect | — | ✅ |
+| 4.5 | MCP server discovery (per ADR-006) | Windows Systems Architect | — | ✅ |
 
 ### Completed waves
 
@@ -120,7 +120,7 @@ A STOP ends the loop turn. Report using the matching template, then **wait for t
 | 3 | Docker Orchestration | ✅ |
 | 5 | Core UI — Design System & Components | ✅ |
 
-Waves 7 (Security Hardening & HITL) and 8 (Distribution & Release) are 🔲 — see BUILD_PLAN.md.
+Waves 7 (Security Hardening & HITL 🟡), 8 (Distribution & Release 🔲), and 9 (Rig Core + Cleanup 🟡) — see BUILD_PLAN.md for full item breakdown.
 
 ---
 

@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn test_env_var_mapping() {
-        let keychain = Keychain::from_env();
+        let _keychain = Keychain::from_env();
         assert_eq!(
             format!("{}_API_KEY", "deepseek".to_uppercase()),
             "DEEPSEEK_API_KEY"

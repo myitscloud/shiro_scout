@@ -1,0 +1,129 @@
+# Release CI for ShiroScout
+# Triggered by pushing a tag matching v*
+# Builds MSI/NSIS installers, signs them (if configured), and creates a GitHub Release
+# D8: Release automation
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+
+      # Install frontend dependencies
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Run verification gates
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Frontend build
+        run: pnpm build
+
+      - name: Rust check
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      - name: Run tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      # Build Tauri application (produces MSI + NSIS)
+      - name: Build Tauri app
+        run: pnpm tauri build
+        env:
+          # If code signing certificate is configured via repository secrets:
+          # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # TAURI_SIGNING_PASSPHRASE: ${{ secrets.TAURI_SIGNING_PASSPHRASE }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Generate update signature for Tauri updater (requires signing key)
+      # - name: Sign update artifact
+      #   if: env.TAURI_SIGNING_PRIVATE_KEY != ''
+      #   shell: pwsh
+      #   run: |
+      #     # Generate update signature using the Tauri signing CLI
+      #     # See: https://v2.tauri.app/start/distribute/#signing-updates
+      #     cargo tauri sign --private-key "$env:TAURI_SIGNING_PRIVATE_KEY" `
+      #       --password "$env:TAURI_SIGNING_PASSPHRASE" `
+      #       --input "src-tauri/target/release/bundle/msi/Shiro Scout_${{ github.ref_name }}_x64_en-US.msi"
+
+      # Upload MSI installer
+      - name: Upload MSI installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: shiro-scout-msi
+          path: src-tauri/target/release/bundle/msi/*.msi
+          retention-days: 30
+
+      # Upload NSIS installer
+      - name: Upload NSIS installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: shiro-scout-nsis
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 30
+
+      # Upload update bundle (for Tauri updater)
+      - name: Upload update bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: shiro-scout-update
+          path: src-tauri/target/release/bundle/**/*.msi
+          retention-days: 30
+
+      # Create GitHub Release
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ShiroScout ${{ github.ref_name }}
+          body: |
+            ## ShiroScout ${{ github.ref_name }}
+
+            ### Installers
+            - **MSI** (enterprise silent install): `Shiro Scout_${{ github.ref_name }}_x64_en-US.msi`
+            - **NSIS** (user-friendly): `Shiro Scout_${{ github.ref_name }}_x64-setup.exe`
+
+            ### Checksums
+            <!-- TODO: Add SHA256 checksums after release build -->
+
+            ### Updater
+            The Tauri updater will automatically download the latest version if you have a previous release installed.
+
+            ### System Requirements
+            - Windows 11 (x64)
+            - Docker Desktop (with WSL2 backend) for sandbox features
+            - 4GB+ RAM recommended
+
+            ### Changelog
+            See [CHANGELOG.md](CHANGELOG.md) for full release notes.
+          tag_name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          files: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
